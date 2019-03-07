@@ -1,0 +1,7 @@
+version: '2'
+
+services:
+    state-machine:
+        image: chalmersfsd/state-machine:v0.0.0
+        network_mode: "host"
+        command: "state-machine --cid=253 --freq=10.0f --verbose=1"
