@@ -20,30 +20,80 @@
 
 #include "opendlv-standard-message-set.hpp"
 
+#include <chrono>
+#include <cstdint>
 
-/*
+
+
 enum asState {
     AS_OFF,
     AS_READY, 
     AS_DRIVING, 
-    AS_FINISHED, 
-    EBS_TRIGGERED
+    AS_FINISHED,
+    AS_EMERGENCY,
+    AS_MANUAL
  };
-*/
+
+ enum asMission {
+    AMI_NONE,
+    AMI_ACCELERATION, 
+    AMI_SKIDPAD, 
+    AMI_TRACKDRIVE, 
+    AMI_AUTOCROSS,
+    AMI_BRAKETEST,
+    AMI_INSPECTION,
+    AMI_MANUAL,
+    AMI_TEST
+};
+
+enum ebsState {
+    EBS_UNAVAILABLE,
+    EBS_ARMED,
+    EBS_ACTIVATED
+};
+
+enum serviceBrakeState {
+    BRAKE_UNAVAILABLE,
+    BRAKE_ENGAGED,
+    BRAKE_AVAILABLE
+};
 
 class StateMachine {
-   private:
+  private:
     StateMachine(const StateMachine &) = delete;
     StateMachine(StateMachine &&)      = delete;
     StateMachine &operator=(const StateMachine &) = delete;
     StateMachine &operator=(StateMachine &&) = delete;
 
-   public:
+  public:
     StateMachine();
     ~StateMachine();
 
-   public:
-    float m_var;
+  private:
+    void setUp();
+    void tearDown();
+    void ebsUpdate();
+    void stateUpdate();
+
+  public:
+    void body();
+
+  public:
+    asState m_prevState;
+    asState m_currentState;
+    asMission m_currentMission;
+    ebsState m_ebsState;
+    serviceBrakeState m_brakeState;
+    bool m_initialized;
+    bool m_ebsArmed;
+    bool m_asms;
+    bool m_tsOn;
+    bool m_rtd;
+    bool m_finishSignal;
+    bool m_ebsSound;
+    float m_vehicleSpeed;
+    uint64_t m_lastStateTransition;
+    
 };
 
 #endif

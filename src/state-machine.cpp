@@ -26,11 +26,13 @@ int32_t main(int32_t argc, char **argv) {
     auto commandlineArguments = cluon::getCommandlineArguments(argc, argv);
     if (0 == commandlineArguments.count("freq")) {
         std::cerr << argv[0] << "Module running state-machine for Lynx" << std::endl;
-        std::cerr << "Usage:   " << argv[0] << " --cid=<OpenDaVINCI session> [--id=<Identifier in case of multiple beaglebone units>] [--verbose]" << std::endl;
+        std::cerr << "Usage:   " << argv[0] << " --cid=<OpenDaVINCI session> --freq=<State-machine frequency> "
+                  << "[--id=<Identifier in case of multiple beaglebone units>] [--verbose]" << std::endl;
         std::cerr << "Example: " << argv[0] << " --cid=111 --cidgpio=220 --cidanalog=221 --cidpwm=222 --id=1 --verbose=1 --freq=30" << std::endl;
         retCode = 1;
     } else {
         // const uint32_t ID{(commandlineArguments["id"].size() != 0) ? static_cast<uint32_t>(std::stoi(commandlineArguments["id"])) : 0};
+        const float FREQ{static_cast<float>(std::stof(commandlineArguments["freq"]))};
 
         // Interface to a running OpenDaVINCI session.  
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
@@ -41,11 +43,12 @@ int32_t main(int32_t argc, char **argv) {
         using namespace std::literals::chrono_literals;
         auto atFrequency{[&od4, &stateMachine]() -> bool
         {
-            std::cout << stateMachine.m_var << std::endl;
+            stateMachine.body();
+            std::cout << stateMachine.m_currentState << std::endl;
             return true;
         }};
 
-        od4.timeTrigger(2.0f, atFrequency);
+        od4.timeTrigger(FREQ, atFrequency);
     }
     return retCode;
 }
