@@ -23,8 +23,6 @@
 #include <chrono>
 #include <cstdint>
 
-
-
 enum asState {
     AS_OFF,
     AS_READY, 
@@ -58,6 +56,14 @@ enum serviceBrakeState {
     BRAKE_AVAILABLE
 };
 
+enum ebsInitState {
+    EBS_INIT_ENTRY,
+    EBS_INIT_CHARGING,
+    EBS_INIT_COMPRESSOR,
+    EBS_INIT_INITIALIZED,
+    EBS_INIT_FAILED
+};
+
 class StateMachine {
   private:
     StateMachine(const StateMachine &) = delete;
@@ -66,35 +72,104 @@ class StateMachine {
     StateMachine &operator=(StateMachine &&) = delete;
 
   public:
-    StateMachine();
+    StateMachine(cluon::OD4Session &od4, cluon::OD4Session &od4Analog, cluon::OD4Session &od4Gpio);
     ~StateMachine();
 
   private:
     void setUp();
     void tearDown();
+    void ebsInit();
     void ebsUpdate();
     void stateUpdate();
+    void setAssi();
 
   public:
     void body();
+    asState getCurrentState();
+    bool getInitialized();
+    uint32_t getSenderStampOffsetAnalog();
+    uint32_t getSenderStampOffsetGpio();
+    uint16_t getAnalogStampEbsLine();
+    uint16_t getAnalogStampServiceTank();
+    uint16_t getAnalogStampEbsActuator();
+    uint16_t getAnalogStampPressureReg();
+    uint16_t getGpioStampEbsOk();
+    uint16_t getGpioStampAsms();
+    uint16_t getGpioStampClampSensor();
+    void setLastUpdateAnalog(cluon::data::TimeStamp time);
+    void setLastUpdateGpio(cluon::data::TimeStamp time);
+    void setMission(uint16_t mission);
+    void setAsms(bool asms);
+    void setTsOn(bool tsOn);
+    void setRtd(bool rtd);
+    void setGoSignal(bool goSignal);
+    void setFinishSignal(bool finishSignal);
+    void setEbsSound(bool ebsSound);
+    void setEbsOk(bool ebsOk);
+    void setClampExtended(bool clampExtended);
+    void setVehicleSpeed(float vehicleSpeed);
+    void setPressureEbsAct(float pressure);
+    void setPressureEbsLine(float pressure);
+    void setPressureServiceTank(float pressure);
+    void setPressureServiceReg(float pressure);
+    void setSteerPosition(float pos);
+    void setSteerPositionRack(float pos);
+    void setBrakeDutyCycle(uint32_t duty);
+    void setTorqueReqLeft(int16_t torque);
+    void setTorqueReqRight(int16_t torque);
 
-  public:
+  private:
+    cluon::OD4Session &m_od4;
+    cluon::OD4Session &m_od4Analog;
+    cluon::OD4Session &m_od4Gpio;
     asState m_prevState;
     asState m_currentState;
-    asMission m_currentMission;
     ebsState m_ebsState;
     serviceBrakeState m_brakeState;
-    bool m_initialized;
-    bool m_ebsArmed;
-    bool m_asms;
-    bool m_tsOn;
-    bool m_rtd;
-    bool m_finishSignal;
-    bool m_ebsSound;
-    float m_vehicleSpeed;
+    ebsInitState m_currentStateEbsInit;
     uint64_t m_lastStateTransition;
-    
-};
+    uint64_t m_lastEbsInitTransition;
+    bool m_initialized;
+    bool m_compressor;
+    bool m_modulesRunning;
+    cluon::data::TimeStamp m_lastUpdateAnalog;
+    cluon::data::TimeStamp m_lastUpdateGpio;
 
+    // Received from other microservices
+    asMission em_currentMission;
+    bool em_asms;
+    bool em_tsOn; // tsOn shares the same signal as ebsOk for now. TODO: Change to other signal when available
+    bool em_rtd;
+    bool em_goSignal;
+    bool em_finishSignal;
+    bool em_ebsSound;
+    bool em_ebsOk;
+    bool em_clampExtended;
+    float em_vehicleSpeed;
+    float em_pressureEbsAct;
+    float em_pressureEbsLine;
+    float em_pressureServiceTank;
+    float em_pressureServiceReg;
+    float em_steerPosition;
+    float em_steerPositionRack;
+    uint32_t em_brakeDutyRequest;
+    int16_t em_torqueReqLeft;
+    int16_t em_torqueReqRight;
+
+    // Senderstamps
+    const uint32_t m_senderStampOffsetGpio = 1000;
+    const uint32_t m_senderStampOffsetAnalog = 1200;
+    const uint32_t m_senderStampOffsetPwm = 1300;
+
+    // Depends on pin value in opendlv-device-stm32-lynx
+    const uint16_t m_gpioStampEbsOk = 49;
+    const uint16_t m_gpioStampAsms = 115;
+    const uint16_t m_gpioStampClampSensor = 112;
+
+    const uint16_t m_analogStampEbsLine = 1;
+    const uint16_t m_analogStampServiceTank = 2;
+    const uint16_t m_analogStampEbsActuator = 3;
+    const uint16_t m_analogStampPressureReg = 5;
+};
 #endif
 
