@@ -5,35 +5,52 @@ This microservice provides the state machine for Lynx. Receives messages from di
 AMD64: docker build -f Dockerfile.amd64 -t chalmersfsd/state-machine:v0.0.0 .
 
 ### Input
+ - Senderstamp Offsets
+  - GPIO: 1000
+  - Analog: 1200
+  - PWM: 1300
  - opendlv::proxy::SwitchStateReading
-    - ASMS on/off (stamp = 1115)
-    - EBS okay true/false (stamp = 1049)
-    - EBS sound on/off (stamp = 1044)
-    - TS on/off (stamp = )
-    - RTD true/false
-    - Go signal true/false
-    - Finish signal true/false
-    - Steering clamp extended true/false
-    - AS mission (stamp = 1406)
+  - ASMS on/off (stamp = 1115)
+  - EBS okay true/false (stamp = 1049)
+  - EBS sound on/off (stamp = 1044)
+  - TS on/off (stamp = ???) (same as EBS okay for now)
+  - RTD true/false (stamp = 1404)
+  - Go signal true/false (stamp = 1410)
+  - Finish signal true/false (stamp = 1403)
+  - Steering clamp extended true/false (stamp = 1112)
+  - AS mission (stamp = 1406)
 
- - Vehicle Speed
- - Pneumatic pressure reading: EBS actuator
- - Pneumatic pressure reading: EBS line
- - Pneumatic pressure reading: service tank
- - Pneumatic pressure reading: service acutator?
- - Torque request right
- - Torque request left
- - Steering rack position
+- opendlv::proxy::GroundSpeedReading
+  - Vehicle Speed (stamp = ???)
+or
+- opendlv::proxy::WheelSpeedReading
+  - Wheel RR (stamp = 1901)
+  - Wheel RL (stamp = 1902)
+  - Wheel FR (stamp = 1903)
+  - Wheel FL (stamp = 1904)
 
- - Unclear if needed / used:
-  - Service brake duty cycle
-  - Steering rack position
-  - Steering position (why 2 different?)
+- opendlv::proxy::PressureReading
+  - Pneumatic pressure reading: EBS actuator (stamp = 1203)
+  - Pneumatic pressure reading: EBS line (stamp = 1201)
+  - Pneumatic pressure reading: service tank (stamp = 1202)
+  - Pneumatic pressure reading: service regulator (stamp = 1205)
+
+- opendlv::proxy::TorqueRequest
+  - Torque request right (stamp = 1501)
+  - Torque request left (stamp = 1500)
+
+- opendlv::proxy::GroundSteeringReading
+  - Steering position (stamp = 1200)
+  - Steering rack position (stamp = 1206)
+
+- opendlv::proxy::PulseWidthModulationRequest
+  - Service brake duty cycle (stamp = 1341)
 
 ### Output
- - Heartbeat (od4Gpio, stamp = 1027)
- - Finished signal (od4Gpio)
- - Shutdown signal (od4Gpio)
+ - opendlv::proxy::SwitchStateReading
+  - Heartbeat (od4Gpio, stamp = 1027)
+  - Finished signal (od4Gpio, stamp = 1066)
+  - Shutdown signal (od4Gpio, stamp = )
  - ASSI red signal (od4Pwm)
  - ASSI green signal (od4Pwm)
  - ASSI blue signal (od4Pwm)

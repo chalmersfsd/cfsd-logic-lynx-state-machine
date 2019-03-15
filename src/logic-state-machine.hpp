@@ -22,6 +22,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <string>
 
 enum asState {
     AS_OFF,

@@ -82,15 +82,15 @@ void StateMachine::tearDown()
 
 void StateMachine::body()
 {
-  while(cluon::time::toMicroseconds(m_lastUpdateAnalog) == 0 && cluon::time::toMicroseconds(m_lastUpdateGpio) == 0){
+  while(cluon::time::toMicroseconds(m_lastUpdateAnalog) == 0 || cluon::time::toMicroseconds(m_lastUpdateGpio) == 0){
     sleep(1);
   }
   m_modulesRunning = true;
 
   int64_t threadTime = cluon::time::toMicroseconds(cluon::time::now());
-  if((((threadTime-cluon::time::toMicroseconds(m_lastUpdateAnalog)) > 500000) || ((threadTime-cluon::time::toMicroseconds(m_lastUpdateGpio)) > 1000000)) && m_modulesRunning){
+  if((((threadTime-cluon::time::toMicroseconds(m_lastUpdateAnalog)) > 500000) && ((threadTime-cluon::time::toMicroseconds(m_lastUpdateGpio)) > 1000000)) && m_modulesRunning){
       m_modulesRunning = false;
-      std::cout << "[ASS-ERROR] Module have crashed. Last gpio update:" << (threadTime-cluon::time::toMicroseconds(m_lastUpdateGpio)) << "\t Last analog update: " << (threadTime-cluon::time::toMicroseconds(m_lastUpdateAnalog)) << std::endl;
+      std::cout << "[ASS-ERROR] Module has crashed. Last gpio update:" << (threadTime-cluon::time::toMicroseconds(m_lastUpdateGpio)) << "\t Last analog update: " << (threadTime-cluon::time::toMicroseconds(m_lastUpdateAnalog)) << std::endl;
   }
 
   if (m_currentStateEbsInit != ebsInitState::EBS_INIT_INITIALIZED){

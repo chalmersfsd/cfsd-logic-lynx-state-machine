@@ -136,8 +136,8 @@ int32_t main(int32_t argc, char **argv) {
             }
 
             if (envelope.senderStamp() == 1341){
-            auto pwmState = cluon::extractMessage<opendlv::proxy::PulseWidthModulationRequest>(std::move(envelope));
-            stateMachine.setBrakeDutyCycle(pwmState.dutyCycleNs());
+                auto pwmState = cluon::extractMessage<opendlv::proxy::PulseWidthModulationRequest>(std::move(envelope));
+                stateMachine.setBrakeDutyCycle(pwmState.dutyCycleNs());
             }
         }};
         od4.dataTrigger(opendlv::proxy::PulseWidthModulationRequest::ID(), onPulseWidthModulationRequest);
@@ -169,6 +169,7 @@ int32_t main(int32_t argc, char **argv) {
             return true;
         }};
 
+        std::cout << "Test" << std::endl;
         od4.timeTrigger(FREQ, atFrequency);
     }
     return retCode;
