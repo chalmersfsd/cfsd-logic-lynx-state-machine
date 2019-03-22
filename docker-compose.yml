@@ -2,6 +2,6 @@ version: '2'
 
 services:
     state-machine:
-        image: chalmersfsd/state-machine:v0.0.0
+        image: lowitz/state-machine:v0.0.0
         network_mode: "host"
-        command: "state-machine --cid=219 --cidAnalog=219 --cidGpio=219 --cidPwm=219 --verbose --freq=2.0f"
+        command: "state-machine --cid=130 --cidAnalog=130 --cidGpio=130 --cidPwm=130 --freq=2.0f"
