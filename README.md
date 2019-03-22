@@ -4,7 +4,7 @@ This microservice provides the state machine for Lynx. Receives messages from di
   - GPIO: 1000
   - Analog: 1200
   - PWM: 1300
-  
+
 ### Build
 AMD64: docker build -f Dockerfile.amd64 -t chalmersfsd/state-machine:v0.0.0 .
 
@@ -61,21 +61,21 @@ or
   - ASSI brake signal (1341)
 
 - opendlv::proxy::SwitchStateReading (od4)
- - Current AS state           (1401)
- - RTD                        (1404)
- - EBS fault                  (1405)
- - Steering state             (1413)
- - EBS state                  (1414)
- - Service brake valve state  (1415)
+  - Current AS state           (1401)
+  - RTD                        (1404)
+  - EBS fault                  (1405)
+  - Steering state             (1413)
+  - EBS state                  (1414)
+  - Service brake valve state  (1415)
 
 - opendlv::proxy::TorqueRequest (od4)
- - Torque request left  (1500)
- - Torque request right (1501)
+  - Torque request left  (1500)
+  - Torque request right (1501)
 
 - opendlv::proxy::PressureReading (od4)
- - Brake Target (1509)
- - Brake Actual (1510)
+  - Brake Target (1509)
+  - Brake Actual (1510)
 
- - Unclear if needed / used:
+- Unclear if needed / used:
   - m_ebsTest (od4Gpio)
   - m_serviceBrake (od4Gpio)
