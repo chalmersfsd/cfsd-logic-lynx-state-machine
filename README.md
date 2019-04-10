@@ -10,15 +10,16 @@ AMD64: docker build -f Dockerfile.amd64 -t chalmersfsd/state-machine:v0.0.0 .
 
 ### Input
 - opendlv::proxy::SwitchStateReading
-  - ASMS on/off             (1115)
-  - EBS okay true/false     (1049)
   - EBS sound               (1044)
-  - TS on/off               (???)
-  - RTD                     (1404)
-  - Go signal               (1410)
-  - Finish signal           (1403)
+  - EBS okay true/false     (1049)
   - Steering clamp extended (1112)
-  - AS mission              (1406)
+  - ASMS on/off             (1115)
+  - TS on/off               (???)
+  - Finish signal           (1403)
+  - RTD                     (1404)
+  - RES stop signal         (1406)
+  - RES status              (1408)
+  - Go signal               (1410)
 
 - opendlv::proxy::GroundSpeedReading
   - Vehicle Speed (???)
@@ -58,7 +59,6 @@ or
   - ASSI red signal   (1320)
   - ASSI green signal (1321)
   - ASSI blue signal  (1300)
-  - ASSI brake signal (1341)
 
 - opendlv::proxy::SwitchStateReading (od4)
   - Current AS state           (1401)

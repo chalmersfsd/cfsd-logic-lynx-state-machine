@@ -26,7 +26,7 @@ float StateMachine::decode(const std::string &data) noexcept {
 }
 */
 
-StateMachine::StateMachine(cluon::OD4Session &od4, cluon::OD4Session &od4Analog, cluon::OD4Session &od4Gpio, cluon::OD4Session &od4Pwm)
+StateMachine::StateMachine(cluon::OD4Session &od4, cluon::OD4Session &od4Analog, cluon::OD4Session &od4Gpio, cluon::OD4Session &od4Pwm, bool verbose)
   : m_od4{od4}
   , m_od4Analog{od4Analog}
   , m_od4Gpio{od4Gpio}
@@ -75,16 +75,18 @@ StateMachine::StateMachine(cluon::OD4Session &od4, cluon::OD4Session &od4Analog,
   , m_heartbeat{false}
   , m_refreshMsg{true}
   , m_brakesReleased{false}
+  , m_verbose{verbose}
 
   , em_currentMission{asMission::AMI_NONE}
   , em_asms{false}
   , em_tsOn{false}
   , em_resGoSignal{false}
-  , em_resStopSignal{false}
+  , em_resStopSignal{true}
   , em_finishSignal{false}
-  , em_ebsOk{true}
+  , em_ebsOk{false}
   , em_clampExtended{false}
   , em_resStatus{false} // TODO: add a guard using this
+  , em_resInitialized{false}
   , em_vehicleSpeed{0.0f}
   , em_pressureEbsAct{0.0f}
   , em_pressureEbsLine{0.0f}
@@ -106,14 +108,18 @@ StateMachine::~StateMachine()
 
 void StateMachine::setUp()
 {
+  std::cout << "Initializing state machine... ";
   m_initialized = true;
 
   cluon::data::TimeStamp sampleTime = cluon::time::now();
   int16_t senderStamp = m_senderStampResInitialize;
 
+  // First part of handshake with RES CAN service
   opendlv::proxy::SwitchStateReading msgCan; // TODO: change to request instead of reading
   msgCan.state(m_initialized);
   m_od4.send(msgCan, sampleTime, senderStamp);
+  
+  std::cout << "done." << std::endl;
 }
 
 void StateMachine::tearDown()
@@ -123,7 +129,7 @@ void StateMachine::tearDown()
 void StateMachine::body()
 {
   // Check if we're receiving data from AS node
-  if(cluon::time::toMicroseconds(m_lastUpdateAnalog) == 0 && cluon::time::toMicroseconds(m_lastUpdateGpio) == 0){
+  if((cluon::time::toMicroseconds(m_lastUpdateAnalog) == 0 && cluon::time::toMicroseconds(m_lastUpdateGpio) == 0) || !em_resInitialized){
     return;
   }
   m_modulesRunning = true;
@@ -133,7 +139,8 @@ void StateMachine::body()
   if((((threadTime-cluon::time::toMicroseconds(m_lastUpdateAnalog)) > 500000) || ((threadTime-cluon::time::toMicroseconds(m_lastUpdateGpio)) > 1000000)) && m_modulesRunning){
       m_modulesRunning = false;
       std::cout << "[ASS-ERROR] Module has crashed. Last gpio update:" << (threadTime-cluon::time::toMicroseconds(m_lastUpdateGpio)) << "\t Last analog update: " << (threadTime-cluon::time::toMicroseconds(m_lastUpdateAnalog)) << std::endl;
-  } 
+  }
+
   if (em_ebsOk) { // TODO: Remove this when tsOn signal has been added to AS node
     em_tsOn = true;
   } else {
@@ -154,7 +161,7 @@ void StateMachine::body()
   // m_serviceBrake = 1;
   // m_steeringState = em_clampExtended;
 
-    
+  // Check steering implausibility
   bool systemReadyOrDriving = (m_currentState == asState::AS_DRIVING || m_currentState == asState::AS_READY);
   bool steeringDiffLarge = std::fabs(em_steerPosition - em_steerPositionRack) > 10.0f;
   if (systemReadyOrDriving && (!em_clampExtended || steeringDiffLarge) && em_resGoSignal){
@@ -180,30 +187,30 @@ void StateMachine::brakeUpdate()
 
   m_serviceBrakePressureOk = em_pressureServiceTank >= 6.0f;
   m_ebsPressureOk = em_pressureEbsLine >= 6.0f;
-  m_brakesReleased = (em_pressureEbsAct < 0.01f && em_pressureServiceReg < 0.01f);
+  m_brakesReleased = (em_pressureEbsAct < 0.1f && em_pressureServiceReg < 0.1f);
   bool systemReadyOrDriving = (m_currentState == asState::AS_DRIVING || m_currentState == asState::AS_READY);
-  bool systemNotOff = (m_currentState != asState::AS_OFF);
+  bool systemNotOff = (m_currentState != asState::AS_OFF && m_currentState != asState::AS_FINISHED);
   bool serviceBrakeLow = (em_pressureServiceTank <= 4.0f) && systemReadyOrDriving;
-    
+     
   bool sensorDisconnected = (em_pressureEbsAct < -0.08f || em_pressureEbsLine < -0.06f || em_pressureServiceTank < -0.07f);
   bool ebsPressureFail = (!m_ebsPressureOk && systemNotOff);
 
   if (sensorDisconnected || ebsPressureFail || serviceBrakeLow || m_currentStateEbsInit == EBS_INIT_FAILED){
     m_ebsFault = true;
     std::cout << "[ASS-ERROR] EBS Failure: sensorDisconnected: " << sensorDisconnected 
-            << " ebsPressureFail: " << ebsPressureFail 
-             << " serviceBrakeLow: " << serviceBrakeLow 
-             << " m_ebsInitFail: " << m_currentStateEbsInit << std::endl;        
+            << "\n ebsPressureFail: " << ebsPressureFail 
+             << "\n serviceBrakeLow: " << serviceBrakeLow 
+             << "\n m_ebsInitFail: " << m_currentStateEbsInit << std::endl;        
   } else {
     m_ebsFault = false;
   }
 
+  // Check if the compressor should be on/off
+  // TODO: Tune pressure parameters
   if ((em_pressureEbsLine > 6.0f && em_pressureServiceTank > 8.0f) || em_pressureServiceTank > 9.0f || em_pressureServiceTank < -0.05f || m_currentState == asState::AS_EMERGENCY){
     m_compressor = false;
   } else if ((em_pressureEbsLine < 5.0f || em_pressureServiceTank < 6.0f) && em_asms) {
     m_compressor = true;
-  } else {
-    m_compressor = false;
   }
 
   if (m_currentState == AS_OFF && m_currentStateEbsInit == EBS_INIT_INITIALIZED && 
@@ -213,13 +220,13 @@ void StateMachine::brakeUpdate()
 
   if (m_brakeState == BRAKE_AVAILABLE) {
     m_brakeDuty = ((m_lastStateTransition+500U) >= timeMillis) ? 20000U : em_brakeDutyRequest;
-  } else if (m_brakeState == BRAKE_ENGAGED && m_serviceBrakePressureOk) {
+  } else if (m_brakeState == BRAKE_ENGAGED && em_pressureEbsAct > 0.1f) {
     m_brakeDuty = 20000U;
-  } else if (m_brakeState == BRAKE_ENGAGED && em_pressureServiceReg < 0.1f && m_currentState == asState::AS_FINISHED) {
+  } else {
     m_brakeDuty = 0U;
   }
 
-    if((!em_ebsOk || !m_modulesRunning || m_ebsFault || m_steerFault) && 
+    if((!em_ebsOk || !m_modulesRunning || m_ebsFault || m_steerFault || !em_resStopSignal) && 
                       m_currentState != asState::AS_EMERGENCY && m_currentState != asState::AS_OFF && m_currentState != asState::AS_MANUAL){
     m_ebsActivatedTime = timeMillis;
     m_ebsState = ebsState::EBS_ACTIVATED;
@@ -230,7 +237,8 @@ void StateMachine::brakeUpdate()
               << " m_steerFault: " << m_steerFault 
               << " m_shutdown: " << m_shutdown
               << " m_finished: " << m_finished
-              << " m_prevState: " << m_prevState << std::endl; 
+              << " m_prevState: " << m_prevState 
+              << " m_resStopSignal: " << em_resStopSignal << std::endl;
   }
 }
 
@@ -252,6 +260,7 @@ void StateMachine::stateUpdate()
     m_firstCycleAsOff = false;
     stopMission();
   } else if (!m_firstCycleAsOff && em_asms) {
+    std::cout << "Running mission: \n";
     m_firstCycleAsOff = true;
     runMission();
   }
@@ -282,7 +291,7 @@ void StateMachine::stateUpdate()
         m_prevState = asState::AS_READY;
         m_currentState = asState::AS_EMERGENCY;
         m_lastStateTransition = timeMillis;
-      } else if (!em_asms && m_brakesReleased) { //TODO: Check if brakeState check is valid
+      } else if (!em_asms && m_brakesReleased) {
         m_prevState = asState::AS_READY;
         m_currentState = asState::AS_OFF;
         m_lastStateTransition = timeMillis;
@@ -319,27 +328,33 @@ void StateMachine::stateUpdate()
       m_ebsState = ebsState::EBS_ACTIVATED;
       m_finished = true;
       
-      if (em_resStopSignal) { // TODO: Change to external RES instead of EBS_ACTIVATED
+      if (!em_resStopSignal) {
         m_prevState = asState::AS_FINISHED;
         m_currentState = asState::AS_EMERGENCY;
         m_lastStateTransition = timeMillis;
-      } else if (!em_asms && m_brakesReleased) { // TODO: Check if brakeState check is valid
+      } else if (!em_asms && m_brakesReleased) {
         m_prevState = asState::AS_FINISHED;
         m_currentState = asState::AS_OFF;
         m_lastStateTransition = timeMillis;
+
+        m_currentStateEbsInit = ebsInitState::EBS_INIT_ENTRY;
+        m_ebsState = ebsState::EBS_UNAVAILABLE;
       }
       break;
 
-    case asState::AS_EMERGENCY:
+    case asState::AS_EMERGENCY: // TODO: Emergency triggered when going from AS_READY -> AS_OFF by releasing the brakes
       m_serviceValveState = 2U;
       m_ebsSpeaker = ((m_ebsActivatedTime+9000) >= timeMillis);
       m_finished = false;
       m_shutdown = true;
 
-      if (!m_ebsSpeaker && !em_asms && m_brakesReleased) { //TODO: Check if brakeState check is valid
+      if (!m_ebsSpeaker && !em_asms && m_brakesReleased) {
         m_prevState = asState::AS_EMERGENCY;
         m_currentState = asState::AS_OFF;
         m_lastStateTransition = timeMillis;
+
+        m_currentStateEbsInit = ebsInitState::EBS_INIT_ENTRY;
+        m_ebsState = ebsState::EBS_UNAVAILABLE;
       } 
       break;
 
@@ -355,14 +370,22 @@ void StateMachine::stateUpdate()
       break;
   }
 
-  if (true) {
+  if (m_verbose) {
     std::cout << "[AS-state] Current AS state: " << m_currentState 
-              << "\n ebsOk: " << em_ebsOk
-              << "\n ASMS: " << em_asms
-              << "\n Mission: " << em_currentMission
-              << "\n EBS state: " << m_ebsState
-              << "\n Brake state: " << m_brakeState 
-              << "\n Compressor: " << m_compressor << "\n" << std::endl;
+              << "\nebsOk: " << em_ebsOk
+              << "\nASMS: " << em_asms
+              << "\nMission: " << em_currentMission
+              << "\nEBS state: " << m_ebsState
+              << "\nBrake state: " << m_brakeState 
+              << "\nCompressor: " << m_compressor 
+              << "\nSteerClamp: " << em_clampExtended
+              << "\nEBS pressure line: " << em_pressureEbsLine
+              << "\nEBS pressure act: " << em_pressureEbsAct
+              << "\nService pressure tank: " << em_pressureServiceTank
+              << "\nService pressure reg: " << em_pressureServiceReg 
+              << "\nbrakeDuty: " << m_brakeDuty
+              << "\nbrakeDutyRequest: " << em_brakeDutyRequest
+              << "\n" << std::endl;
   }
 
 }
@@ -386,13 +409,14 @@ void StateMachine::ebsInit()
     break;
 
   case ebsInitState::EBS_INIT_CHARGING:
+    m_brakeDuty = 20000U;
     if (em_pressureEbsAct >= 5 && em_pressureEbsLine >= 5 && em_pressureServiceTank >= 6)
     {
       m_compressor = false;
       m_currentStateEbsInit = ebsInitState::EBS_INIT_COMPRESSOR;
       m_lastEbsInitTransition = timeMillis;
     }
-    else if (((m_lastEbsInitTransition + 5000) <= timeMillis) && (em_pressureEbsAct <= 0.5 || em_pressureServiceReg <= 0.5))
+    else if (((m_lastEbsInitTransition + 5000) <= timeMillis) && (em_pressureEbsAct <= 0.5))
     {
       std::cout << "[EBS-Init] Failed to increase pressure above 0.5bar in 5s."
                 << " m_pressureEbsAct: " << em_pressureEbsAct
@@ -421,8 +445,7 @@ void StateMachine::ebsInit()
     break;
   }
 
-  // TODO: Add VERBOSE
-  if (true)
+  if (m_verbose)
   {
     std::cout << "[EBS-Init] Current EBS Init state: " << m_currentStateEbsInit << std::endl;
   }
@@ -437,10 +460,10 @@ void StateMachine::setAssi()
 
   if (m_nextFlashTime <= timeMillis){
     m_flash2Hz  = !m_flash2Hz;
-    m_nextFlashTime = timeMillis + 250;
+    m_nextFlashTime = timeMillis + 500U; // TODO: Make better solution
   }
 
-  if (false){ // TODO: add verbose
+  if (false){
     std::cout << "[ASSI-Time] Time: " << timeMillis << "ms \t2Hz toogle:" << m_flash2Hz << std::endl;
   } 
 
@@ -498,7 +521,7 @@ void StateMachine::sendMessages()
   msgGpio.state(m_heartbeat);
   m_od4Gpio.send(msgGpio, sampleTime, senderStamp);
 
-  if (false) { // TODO: Add verbose
+  if (false) {
     std::cout << "[ASS-Machine] Current outputs: m_finished: " << m_finished << "\t m_shutdown: " << m_shutdown << std::endl;
   }
 
@@ -536,6 +559,7 @@ void StateMachine::sendMessages()
     m_finishedOld = m_finished;
   }
 
+/*
   // m_shutdown Msg
   if (m_shutdown != m_shutdownOld || m_refreshMsg) {
     senderStamp = m_gpioStampShutdown + m_senderStampOffsetGpio;
@@ -543,7 +567,7 @@ void StateMachine::sendMessages()
     m_od4Gpio.send(msgGpio, sampleTime, senderStamp);
     m_shutdownOld = m_shutdown;
   }
-
+*/
   /*
   // m_serviceBrake
   if (m_serviceBrake != m_serviceBrakeOld || m_refreshMsg) {
@@ -575,6 +599,7 @@ void StateMachine::sendMessages()
     m_od4Pwm.send(msgPwm, sampleTime, senderStamp);
     m_blueDutyOld = m_blueDuty;
   }
+
   if (m_brakeDuty != m_brakeDutyOld || m_refreshMsg) {
     senderStamp = m_pwmStampBrake + m_senderStampOffsetPwm;
     msgPwm.dutyCycleNs(m_brakeDuty);
@@ -598,9 +623,11 @@ void StateMachine::sendMessages()
   msgGpioRead.state((uint16_t)m_ebsFault);
   m_od4.send(msgGpioRead, sampleTime, senderStamp);
 
+  /*
   senderStamp = m_senderStampSteeringState;
   msgGpioRead.state((uint16_t)em_clampExtended); // TODO: Add separate state for steering available/unavailable (m_steeringState)
   m_od4.send(msgGpioRead, sampleTime, senderStamp);
+  */
 
   senderStamp = m_senderStampEbsState;
   msgGpioRead.state((uint16_t)m_ebsState);
@@ -668,59 +695,61 @@ void StateMachine::runMission(){
               //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/script/inspection-up.sh\" &")
               << std::endl; // Docker compose up.
     break;
-  case asMission::AMI_TEST:
+  case asMission::AMI_MANUAL:
     std::cout << "Starting Test mission... "
-              //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/script/test-up.sh\" &")
+              << system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/state-machine-test/test-up.sh\" &")
               << std::endl; // Docker compose up.
     break;
   default:
     break;
   }
 }
-void StateMachine::stopMission(){
-    switch(em_currentMission){
-        case asMission::AMI_NONE:
-            break;
-        case asMission::AMI_ACCELERATION:
-            std::cout << "Stopping Acceleration mission... " 
-                //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/script/acceleration-down.sh\" &") 
-                << std::endl;  // Docker compose up.
-            break;
-        case asMission::AMI_SKIDPAD:
-            std::cout << "Stopping Skid pad mission... " 
-                //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/script/skidpad-down.sh\" &") 
-                << std::endl;  // Docker compose up.
-            break;
+void StateMachine::stopMission()
+{
+  switch (em_currentMission)
+  {
+  case asMission::AMI_NONE:
+    break;
+
+  case asMission::AMI_ACCELERATION:
+    std::cout << "Stopping Acceleration mission... "
+              //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/script/acceleration-down.sh\" &")
+              << std::endl; // Docker compose up.
+    break;
+  case asMission::AMI_SKIDPAD:
+    std::cout << "Stopping Skid pad mission... "
+              //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/script/skidpad-down.sh\" &")
+              << std::endl; // Docker compose up.
+    break;
   case asMission::AMI_AUTOCROSS:
     std::cout << "Stopping Autocross mission... "
               //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/script/autocross-down.sh\" &")
               << std::endl; // Docker compose up.
     break;
-        case asMission::AMI_TRACKDRIVE:
-            std::cout << "Stopping Trackdrive mission... " 
-                //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/script/trackdrive-down.sh\" &") 
-                << std::endl;  // Docker compose up.
-            break;
-        case asMission::AMI_BRAKETEST:
-            std::cout << "Stopping Brake test mission... " 
-                //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/script/braketest-down.sh\" &") 
-                << std::endl;  // Docker compose up.
-            break;
-        case asMission::AMI_INSPECTION:
-            std::cout << "Stopping Inspection mission... " 
-                //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/script/inspection-down.sh\" &") 
-                << std::endl;  // Docker compose up.
-            break;
-        case asMission::AMI_TEST:
-            std::cout << "Stopping Test mission... " 
-                //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/script/test-down.sh\" &") 
-                << std::endl;  // Docker compose up.         
-            break;
-        default:
-        break;
-    }
+  case asMission::AMI_TRACKDRIVE:
+    std::cout << "Stopping Trackdrive mission... "
+              //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/script/trackdrive-down.sh\" &")
+              << std::endl; // Docker compose up.
+    break;
+  case asMission::AMI_BRAKETEST:
+    std::cout << "Stopping Brake test mission... "
+              //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/script/braketest-down.sh\" &")
+              << std::endl; // Docker compose up.
+    break;
+  case asMission::AMI_INSPECTION:
+    std::cout << "Stopping Inspection mission... "
+              //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/script/inspection-down.sh\" &")
+              << std::endl; // Docker compose up.
+    break;
+  case asMission::AMI_MANUAL:
+    std::cout << "Stopping Test mission... "
+              << system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/state-machine-test/test-down.sh\" &")
+              << std::endl; // Docker compose up.
+    break;
+  default:
+    break;
+  }
 }
-
 
 asState StateMachine::getCurrentState() {return m_currentState;}
 bool StateMachine::getInitialized() {return m_initialized;}
@@ -837,4 +866,8 @@ void StateMachine::setTorqueReqRight(int16_t torque)
 void StateMachine::setResStatus(bool status)
 {
   em_resStatus = status;
+
+  if (!em_resInitialized) {
+    em_resInitialized = status;
+  }
 }

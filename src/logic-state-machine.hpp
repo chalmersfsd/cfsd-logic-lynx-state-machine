@@ -37,8 +37,8 @@ enum asState {
     AMI_NONE,
     AMI_ACCELERATION, 
     AMI_SKIDPAD, 
-    AMI_AUTOCROSS,
     AMI_TRACKDRIVE, 
+    AMI_AUTOCROSS,
     AMI_BRAKETEST,
     AMI_INSPECTION,
     AMI_MANUAL,
@@ -73,7 +73,7 @@ class StateMachine {
     StateMachine &operator=(StateMachine &&) = delete;
 
   public:
-    StateMachine(cluon::OD4Session &od4, cluon::OD4Session &od4Analog, cluon::OD4Session &od4Gpio, cluon::OD4Session &od4Pwm);
+    StateMachine(cluon::OD4Session &od4, cluon::OD4Session &od4Analog, cluon::OD4Session &od4Gpio, cluon::OD4Session &od4Pwm, bool verbose);
     ~StateMachine();
 
   private:
@@ -171,6 +171,7 @@ class StateMachine {
     bool m_heartbeat;
     bool m_refreshMsg;
     bool m_brakesReleased;
+    bool m_verbose;
 
     // Received from other microservices
     asMission em_currentMission;
@@ -182,6 +183,7 @@ class StateMachine {
     bool em_ebsOk;
     bool em_clampExtended;
     bool em_resStatus;
+    bool em_resInitialized;
     float em_vehicleSpeed;
     float em_pressureEbsAct;
     float em_pressureEbsLine;
