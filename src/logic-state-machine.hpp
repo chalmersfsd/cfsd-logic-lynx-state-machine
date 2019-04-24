@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018  Christian Berger
+ * Copyright (C) 2018  Love Mowitz
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -150,11 +150,12 @@ class StateMachine {
     uint16_t m_torqueReqRightCan;
     uint8_t m_brakeActual; // TODO: Check what these two were used for
     uint8_t m_brakeTarget; // TODO: Check what these two were used for
-    uint8_t m_serviceValveState;
     bool m_initialized;
     bool m_compressor;
     bool m_compressorOld;
     bool m_modulesRunning;
+    bool m_serviceBrake;
+    bool m_serviceBrakeOld;
     bool m_serviceBrakePressureOk;
     bool m_ebsPressureOk;
     bool m_steerFault;
@@ -201,6 +202,7 @@ class StateMachine {
     const uint32_t m_senderStampOffsetPwm = 1300;
 
     // Broadcast
+    const uint32_t m_senderStampResInitialize = 1099;
     const uint32_t m_senderStampCurrentState = 1401;
     const uint32_t m_senderStampRTD = 1404;
     const uint32_t m_senderStampEBSFault = 1405;
@@ -208,7 +210,6 @@ class StateMachine {
     const uint32_t m_senderStampSteeringState = 1413;
     const uint32_t m_senderStampEbsState = 1414;
     const uint32_t m_senderStampServiceValveState = 1415;
-    const uint32_t m_senderStampResInitialize = 1499;
     const uint32_t m_senderStampTorqueLeft = 1500;
     const uint32_t m_senderStampTorqueRight = 1501;
     const uint32_t m_senderStampBrakeTarget = 1509;

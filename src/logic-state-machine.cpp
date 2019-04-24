@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018  <Insert name here>
+ * Copyright (C) 2018  Love Mowitz
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -54,18 +54,19 @@ StateMachine::StateMachine(cluon::OD4Session &od4, cluon::OD4Session &od4Analog,
   , m_torqueReqRightCan{0U}
   , m_brakeActual{0U}
   , m_brakeTarget{0U}
-  , m_serviceValveState{0U}
   , m_initialized{false}
   , m_compressor{false}
   , m_compressorOld{false}
   , m_modulesRunning{false}
+  , m_serviceBrake{false}
+  , m_serviceBrakeOld{false}
   , m_serviceBrakePressureOk{false}
   , m_ebsPressureOk{false}
   , m_steerFault{false}
   , m_ebsFault{false}
   , m_flash2Hz{false}
   , m_rtd{false}
-  , m_firstCycleAsOff{false}
+  , m_firstCycleAsOff{true}
   , m_finished{false}
   , m_finishedOld{false}
   , m_shutdown{false}
@@ -112,10 +113,10 @@ void StateMachine::setUp()
   m_initialized = true;
 
   cluon::data::TimeStamp sampleTime = cluon::time::now();
-  int16_t senderStamp = m_senderStampResInitialize;
+  int32_t senderStamp = m_senderStampResInitialize;
 
   // First part of handshake with RES CAN service
-  opendlv::proxy::SwitchStateReading msgCan; // TODO: change to request instead of reading
+  opendlv::proxy::SwitchStateRequest msgCan;
   msgCan.state(m_initialized);
   m_od4.send(msgCan, sampleTime, senderStamp);
   
@@ -128,8 +129,10 @@ void StateMachine::tearDown()
 
 void StateMachine::body()
 {
+  bool frontNodeOk = cluon::time::toMicroseconds(m_lastUpdateAnalog) != 0 && cluon::time::toMicroseconds(m_lastUpdateGpio) != 0;
   // Check if we're receiving data from AS node
-  if((cluon::time::toMicroseconds(m_lastUpdateAnalog) == 0 && cluon::time::toMicroseconds(m_lastUpdateGpio) == 0) || !em_resInitialized){
+  if(!frontNodeOk || !em_resInitialized){
+    std::cout << "Front node status: " << (frontNodeOk ? "On\n" : "Off\n") << "RES status: " << (em_resInitialized ? "On" : "Off") << std::endl;
     return;
   }
   m_modulesRunning = true;
@@ -139,6 +142,10 @@ void StateMachine::body()
   if((((threadTime-cluon::time::toMicroseconds(m_lastUpdateAnalog)) > 500000) || ((threadTime-cluon::time::toMicroseconds(m_lastUpdateGpio)) > 1000000)) && m_modulesRunning){
       m_modulesRunning = false;
       std::cout << "[ASS-ERROR] Module has crashed. Last gpio update:" << (threadTime-cluon::time::toMicroseconds(m_lastUpdateGpio)) << "\t Last analog update: " << (threadTime-cluon::time::toMicroseconds(m_lastUpdateAnalog)) << std::endl;
+  }
+
+  if (!em_resStatus && m_modulesRunning) {
+
   }
 
   if (em_ebsOk) { // TODO: Remove this when tsOn signal has been added to AS node
@@ -154,12 +161,7 @@ void StateMachine::body()
   brakeUpdate();
   stateUpdate();
   setAssi();
-  m_heartbeat = !m_heartbeat;
   sendMessages();
-
-
-  // m_serviceBrake = 1;
-  // m_steeringState = em_clampExtended;
 
   // Check steering implausibility
   bool systemReadyOrDriving = (m_currentState == asState::AS_DRIVING || m_currentState == asState::AS_READY);
@@ -174,6 +176,7 @@ void StateMachine::body()
 
 }
 
+// TODO: handle EBS error LED signal
 void StateMachine::brakeUpdate()
 {
   std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
@@ -195,21 +198,11 @@ void StateMachine::brakeUpdate()
   bool sensorDisconnected = (em_pressureEbsAct < -0.08f || em_pressureEbsLine < -0.06f || em_pressureServiceTank < -0.07f);
   bool ebsPressureFail = (!m_ebsPressureOk && systemNotOff);
 
-  if (sensorDisconnected || ebsPressureFail || serviceBrakeLow || m_currentStateEbsInit == EBS_INIT_FAILED){
-    m_ebsFault = true;
-    std::cout << "[ASS-ERROR] EBS Failure: sensorDisconnected: " << sensorDisconnected 
-            << "\n ebsPressureFail: " << ebsPressureFail 
-             << "\n serviceBrakeLow: " << serviceBrakeLow 
-             << "\n m_ebsInitFail: " << m_currentStateEbsInit << std::endl;        
-  } else {
-    m_ebsFault = false;
-  }
-
   // Check if the compressor should be on/off
   // TODO: Tune pressure parameters
   if ((em_pressureEbsLine > 6.0f && em_pressureServiceTank > 8.0f) || em_pressureServiceTank > 9.0f || em_pressureServiceTank < -0.05f || m_currentState == asState::AS_EMERGENCY){
     m_compressor = false;
-  } else if ((em_pressureEbsLine < 5.0f || em_pressureServiceTank < 6.0f) && em_asms) {
+  } else if (em_asms && (em_pressureEbsLine < 5.0f || em_pressureServiceTank < 6.0f)) {
     m_compressor = true;
   }
 
@@ -226,11 +219,23 @@ void StateMachine::brakeUpdate()
     m_brakeDuty = 0U;
   }
 
+  // Check the EBS, service and steering status if ASMS is on
+  if (em_asms) {
+    if (sensorDisconnected || ebsPressureFail || serviceBrakeLow || m_currentStateEbsInit == EBS_INIT_FAILED){
+      m_ebsFault = true;
+      std::cout << "[ASS-ERROR] EBS Failure: sensorDisconnected: " << sensorDisconnected 
+              << "\n ebsPressureFail: " << ebsPressureFail 
+               << "\n serviceBrakeLow: " << serviceBrakeLow 
+               << "\n m_ebsInitFail: " << m_currentStateEbsInit << std::endl;        
+    } else {
+      m_ebsFault = false;
+    }
+
     if((!em_ebsOk || !m_modulesRunning || m_ebsFault || m_steerFault || !em_resStopSignal) && 
-                      m_currentState != asState::AS_EMERGENCY && m_currentState != asState::AS_OFF && m_currentState != asState::AS_MANUAL){
-    m_ebsActivatedTime = timeMillis;
-    m_ebsState = ebsState::EBS_ACTIVATED;
-    std::cout << "[ASS-Machine] Current state: " << m_currentState 
+                      (m_currentState == asState::AS_READY || m_currentState == asState::AS_DRIVING || m_currentState == asState::AS_FINISHED)){
+      m_ebsActivatedTime = timeMillis;
+      m_ebsState = ebsState::EBS_ACTIVATED;
+      std::cout << "[ASS-Machine] Current state: " << m_currentState 
               << " Values: m_ebsOk: " << em_ebsOk 
               << " m_modulesRunning: " << m_modulesRunning 
               << " m_ebsFault: " << m_ebsFault 
@@ -239,6 +244,7 @@ void StateMachine::brakeUpdate()
               << " m_finished: " << m_finished
               << " m_prevState: " << m_prevState 
               << " m_resStopSignal: " << em_resStopSignal << std::endl;
+    }
   }
 }
 
@@ -267,12 +273,12 @@ void StateMachine::stateUpdate()
 
   switch(m_currentState) {
     case asState::AS_OFF:
-      m_serviceValveState = 1U;
+      m_serviceBrake = false;
       em_finishSignal = false;
       em_resGoSignal = false;
       m_brakeState = serviceBrakeState::BRAKE_UNAVAILABLE;
 
-      if (em_currentMission != AMI_NONE && em_currentMission != AMI_MANUAL && m_ebsState == EBS_ARMED && em_asms && em_tsOn) { // TODO: Check that external tsOn button is used here
+      if (em_currentMission != AMI_NONE && em_currentMission != AMI_MANUAL && m_ebsState == EBS_ARMED && em_asms && em_tsOn) {
         m_prevState = asState::AS_OFF;
         m_currentState = asState::AS_READY;
         m_lastStateTransition = timeMillis;
@@ -285,7 +291,7 @@ void StateMachine::stateUpdate()
 
     case asState::AS_READY:
       m_brakeState = serviceBrakeState::BRAKE_ENGAGED;
-      m_serviceValveState = 2U;
+      m_serviceBrake = true;
 
       if (m_ebsState == EBS_ACTIVATED) {
         m_prevState = asState::AS_READY;
@@ -295,6 +301,9 @@ void StateMachine::stateUpdate()
         m_prevState = asState::AS_READY;
         m_currentState = asState::AS_OFF;
         m_lastStateTransition = timeMillis;
+
+        m_currentStateEbsInit = EBS_INIT_ENTRY;
+        m_ebsState = EBS_UNAVAILABLE;
       } else if ((timeMillis - m_lastStateTransition > 5000) && em_resGoSignal && em_clampExtended) {
         m_prevState = asState::AS_READY;
         m_currentState = asState::AS_DRIVING;
@@ -305,7 +314,6 @@ void StateMachine::stateUpdate()
       break;
 
     case asState::AS_DRIVING:
-      m_serviceValveState = 3U;
       m_brakeState = serviceBrakeState::BRAKE_AVAILABLE;
       m_torqueReqLeftCan = em_torqueReqLeft;
       m_torqueReqRightCan = em_torqueReqRight;
@@ -323,7 +331,6 @@ void StateMachine::stateUpdate()
       break;
 
     case asState::AS_FINISHED:
-      m_serviceValveState = 2U;
       m_brakeState = serviceBrakeState::BRAKE_ENGAGED;
       m_ebsState = ebsState::EBS_ACTIVATED;
       m_finished = true;
@@ -343,7 +350,6 @@ void StateMachine::stateUpdate()
       break;
 
     case asState::AS_EMERGENCY: // TODO: Emergency triggered when going from AS_READY -> AS_OFF by releasing the brakes
-      m_serviceValveState = 2U;
       m_ebsSpeaker = ((m_ebsActivatedTime+9000) >= timeMillis);
       m_finished = false;
       m_shutdown = true;
@@ -390,6 +396,7 @@ void StateMachine::stateUpdate()
 
 }
 
+// TODO: Also check hydraulic brake pressure during this startup procedure
 void StateMachine::ebsInit()
 {
   // TODO: figure out if m_ebsTest is needed or not
@@ -401,7 +408,7 @@ void StateMachine::ebsInit()
   switch (m_currentStateEbsInit)
   {
   case ebsInitState::EBS_INIT_ENTRY:
-    if (em_asms && em_ebsOk)
+    if (em_asms)
     {
       m_currentStateEbsInit = ebsInitState::EBS_INIT_CHARGING;
       m_lastEbsInitTransition = timeMillis;
@@ -416,7 +423,7 @@ void StateMachine::ebsInit()
       m_currentStateEbsInit = ebsInitState::EBS_INIT_COMPRESSOR;
       m_lastEbsInitTransition = timeMillis;
     }
-    else if (((m_lastEbsInitTransition + 5000) <= timeMillis) && (em_pressureEbsAct <= 0.5))
+    else if (((m_lastEbsInitTransition + 5000) <= timeMillis) && (em_pressureEbsAct <= 0.5)) // TODO: check EBS_line too
     {
       std::cout << "[EBS-Init] Failed to increase pressure above 0.5bar in 5s."
                 << " m_pressureEbsAct: " << em_pressureEbsAct
@@ -517,6 +524,7 @@ void StateMachine::sendMessages()
   opendlv::proxy::SwitchStateRequest msgGpio;
 
   //Heartbeat Msg
+  m_heartbeat = !m_heartbeat;
   senderStamp = m_gpioStampHeartbeat + m_senderStampOffsetGpio;
   msgGpio.state(m_heartbeat);
   m_od4Gpio.send(msgGpio, sampleTime, senderStamp);
@@ -568,7 +576,6 @@ void StateMachine::sendMessages()
     m_shutdownOld = m_shutdown;
   }
 */
-  /*
   // m_serviceBrake
   if (m_serviceBrake != m_serviceBrakeOld || m_refreshMsg) {
     senderStamp = m_gpioStampServiceBrake + m_senderStampOffsetGpio;
@@ -576,7 +583,6 @@ void StateMachine::sendMessages()
     m_od4Gpio.send(msgGpio, sampleTime, senderStamp);
     m_serviceBrakeOld = m_serviceBrake;
   }
-  */
 
   // Send pwm Requests
   opendlv::proxy::PulseWidthModulationRequest msgPwm;
@@ -632,10 +638,7 @@ void StateMachine::sendMessages()
   senderStamp = m_senderStampEbsState;
   msgGpioRead.state((uint16_t)m_ebsState);
   m_od4.send(msgGpioRead, sampleTime, senderStamp);
-
-  senderStamp = m_senderStampServiceValveState;
-  msgGpioRead.state((uint16_t)m_serviceValveState);
-  m_od4.send(msgGpioRead, sampleTime, senderStamp);
+  
 
   opendlv::proxy::TorqueRequest msgTorqueReq;
 
@@ -743,7 +746,7 @@ void StateMachine::stopMission()
     break;
   case asMission::AMI_MANUAL:
     std::cout << "Stopping Test mission... "
-              << system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/state-machine-test/test-down.sh\" &")
+              //<< system("sshpass -p cfsd ssh -o StrictHostKeyChecking=no cfsd@127.0.0.1 \"sh /home/cfsd/state-machine-test/test-down.sh\" &")
               << std::endl; // Docker compose up.
     break;
   default:

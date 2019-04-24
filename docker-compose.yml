@@ -2,6 +2,8 @@ version: '2'
 
 services:
     state-machine:
-        image: lowitz/state-machine:v0.0.0
+        image: lowitz/state-machine:v0.0.1
         network_mode: "host"
-        command: "state-machine --cid=219 --cidAnalog=219 --cidGpio=219 --cidPwm=219 --freq=2.0f --verbose"
+        depends_on:
+         - cangw-res
+        command: "state-machine --cid=219 --cidAnalog=219 --cidGpio=219 --cidPwm=219 --freq=2 --verbose"
