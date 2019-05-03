@@ -210,8 +210,8 @@ class StateMachine {
     const uint32_t m_senderStampSteeringState = 1413;
     const uint32_t m_senderStampEbsState = 1414;
     const uint32_t m_senderStampServiceValveState = 1415;
-    const uint32_t m_senderStampTorqueLeft = 1500;
-    const uint32_t m_senderStampTorqueRight = 1501;
+    const uint32_t m_senderStampTorqueLeft = 1502;
+    const uint32_t m_senderStampTorqueRight = 1503;
     const uint32_t m_senderStampBrakeTarget = 1509;
     const uint32_t m_senderStampBrakeActual = 1510;
 

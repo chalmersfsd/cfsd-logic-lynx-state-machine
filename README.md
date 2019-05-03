@@ -69,8 +69,8 @@ or
   - Service brake valve state  (1415)
 
 - opendlv::proxy::TorqueRequest (od4)
-  - Torque request left  (1500)
-  - Torque request right (1501)
+  - Torque request left  (1502)
+  - Torque request right (1503)
 
 - opendlv::proxy::PressureReading (od4)
   - Brake Target (1509)
