@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018  Björnborg Nguyen
+ * Copyright (C) 2018  Love Mowitz
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,50 +26,101 @@
 // #include <string>
 // #include <vector>
 
-TEST_CASE("Test OxTSDecoder with empty payload.") {
-    // const std::string DATA;
+TEST_CASE("Test AS state at startup") {
+    cluon::OD4Session od4{111};
+    cluon::OD4Session od4Analog{111};
+    cluon::OD4Session od4Gpio{111};
+    cluon::OD4Session od4Pwm{111};
 
-    // OxTSDecoder d;
-    // auto retVal = d.decode(DATA);
-//
-    // REQUIRE(!retVal.first);
+    StateMachine stateMachine(od4, od4Analog, od4Gpio, od4Pwm, 0);
+    stateMachine.body();
+    asState state = stateMachine.getCurrentState();
+
+    REQUIRE(state == asState::AS_OFF);
 }
 
-// TEST_CASE("Test OxTSDecoder with faulty payload.") {
-//     const std::string DATA{"Hello World"};
+TEST_CASE("Test AS transitions") {
+    cluon::OD4Session od4{111};
+    cluon::OD4Session od4Analog{111};
+    cluon::OD4Session od4Gpio{111};
+    cluon::OD4Session od4Pwm{111};
 
-//     OxTSDecoder d;
-//     auto retVal = d.decode(DATA);
+    StateMachine stateMachine(od4, od4Analog, od4Gpio, od4Pwm, 0);
 
-//     REQUIRE(!retVal.first);
-// }
+    SECTION("AS_OFF to AS_READY") {
+        stateMachine.setResStatus(true);
+        stateMachine.setPressureServiceTank(7.0f);
+        stateMachine.setPressureEbsLine(7.0f);
+        stateMachine.setPressureServiceReg(0.0f);
+        stateMachine.setPressureEbsAct(7.0f);
+        stateMachine.setAsms(true);
+        stateMachine.setEbsOk(true);
+        stateMachine.setLastUpdateAnalog(cluon::time::now());
+        stateMachine.setLastUpdateGpio(cluon::time::now());
+        stateMachine.setClampExtended(true);
+        stateMachine.setSteerPosition(0.0f);
+        stateMachine.setSteerPositionRack(0.0f);
+        stateMachine.setMission(asMission::AMI_ACCELERATION);
 
-// TEST_CASE("Test OxTSDecoder with sample payload.") {
-//     std::vector<uint8_t> sample{
-//       0xe7, 0x9c, 0x95, 0x95, 0x08, 0x00, 0x7c, 0x0e,
-//       0x00, 0x06, 0x81, 0xfe, 0x45, 0x00, 0x00, 0xf4,
-//       0x00, 0x00, 0xaa, 0xff, 0xff, 0x04, 0xc2, 0x92,
-//       0xf2, 0x9e, 0x60, 0x0a, 0x35, 0xf0, 0x3f, 0x46,
-//       0x63, 0x83, 0x3b, 0x7c, 0x96, 0xcc, 0x3f, 0x23,
-//       0x5a, 0xd0, 0x42, 0x32, 0x00, 0x00, 0x05, 0x00,
-//       0x00, 0x2c, 0x00, 0x00, 0xeb, 0xae, 0xe0, 0x00,
-//       0x59, 0x00, 0xbe, 0x6b, 0xff, 0xe4, 0x1d, 0x01,
-//       0x00, 0x00, 0x00, 0xff, 0xff, 0x01, 0xff, 0xe4
-//     };
+        for (int i = 0; i < 10; i++) {
+            stateMachine.body();
+        }
+        asState state = stateMachine.getCurrentState();
 
-    // const std::string DATA(reinterpret_cast<char*>(sample.data()), sample.size());
+        REQUIRE(state == asState::AS_READY);
+    }
 
-    // OxTSDecoder d;
-    // auto retVal = d.decode(DATA);
+/*
+    SECTION("AS_READY to AS_DRIVING") {
+        std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
+        auto tp_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(tp);
+        auto value = tp_ms.time_since_epoch();
+        uint64_t timeMillis = value.count();
+        uint64_t timePoint = timeMillis;
 
-    // REQUIRE(retVal.first);
+        while (timeMillis - timePoint <= 5000) {
+            stateMachine.setPressureServiceTank(7.0f);
+            stateMachine.setPressureEbsLine(7.0f);
+            stateMachine.setPressureServiceReg(0.0f);
+            stateMachine.setPressureEbsAct(7.0f);
+            stateMachine.setAsms(true);
+            stateMachine.setEbsOk(true);
+            usleep(400000);
+            
+            tp = std::chrono::system_clock::now();
+            tp_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(tp);
+            value = tp_ms.time_since_epoch();
+            timeMillis = value.count();
+        }
 
-    // auto msgs = retVal.second;
-    // opendlv::proxy::GeodeticWgs84Reading msg1 = msgs.first;
-    // opendlv::proxy::GeodeticHeadingReading msg2 = msgs.second;
+        stateMachine.setGoSignal(true);
+        stateMachine.body();
+       
+        asState state = stateMachine.getCurrentState();
 
-    // REQUIRE(58.037722605 == Approx(msg1.latitude()));
-    // REQUIRE(12.796579564 == Approx(msg1.longitude()));
+        REQUIRE(state == asState::AS_DRIVING);
+    }
 
-    // REQUIRE(2.1584727764 == Approx(msg2.northHeading()));
-// }
+    SECTION("AS_DRIVING to AS_FINISHED") {
+        stateMachine.setVehicleSpeed(0.0f);
+        stateMachine.setFinishSignal(true);
+
+        stateMachine.body();
+        asState state = stateMachine.getCurrentState();
+
+        REQUIRE(state == asState::AS_FINISHED);
+    }
+
+    SECTION("AS_FINISHED to AS_OFF") {
+        stateMachine.setAsms(false);
+        stateMachine.setPressureEbsAct(0.0f);
+        stateMachine.setPressureServiceReg(0.0f);
+
+        stateMachine.body();
+        asState state = stateMachine.getCurrentState();
+
+        REQUIRE(state == asState::AS_OFF);
+    }
+    */
+
+}

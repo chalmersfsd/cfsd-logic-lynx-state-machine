@@ -4,6 +4,6 @@ services:
     state-machine:
         image: lowitz/state-machine:v0.0.1
         network_mode: "host"
-        depends_on:
-         - cangw-res
+       depends_on:
+         - cangw-res # Wait for the RES communication for "handshake"
         command: "state-machine --cid=219 --cidAnalog=219 --cidGpio=219 --cidPwm=219 --freq=2 --verbose"

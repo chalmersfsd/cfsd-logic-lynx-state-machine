@@ -144,10 +144,6 @@ void StateMachine::body()
       std::cout << "[ASS-ERROR] Module has crashed. Last gpio update:" << (threadTime-cluon::time::toMicroseconds(m_lastUpdateGpio)) << "\t Last analog update: " << (threadTime-cluon::time::toMicroseconds(m_lastUpdateAnalog)) << std::endl;
   }
 
-  if (!em_resStatus && m_modulesRunning) {
-
-  }
-
   if (em_ebsOk) { // TODO: Remove this when tsOn signal has been added to AS node
     em_tsOn = true;
   } else {
@@ -349,7 +345,7 @@ void StateMachine::stateUpdate()
       }
       break;
 
-    case asState::AS_EMERGENCY: // TODO: Emergency triggered when going from AS_READY -> AS_OFF by releasing the brakes
+    case asState::AS_EMERGENCY:
       m_ebsSpeaker = ((m_ebsActivatedTime+9000) >= timeMillis);
       m_finished = false;
       m_shutdown = true;
@@ -638,7 +634,7 @@ void StateMachine::sendMessages()
   senderStamp = m_senderStampEbsState;
   msgGpioRead.state((uint16_t)m_ebsState);
   m_od4.send(msgGpioRead, sampleTime, senderStamp);
-  
+
 
   opendlv::proxy::TorqueRequest msgTorqueReq;
 

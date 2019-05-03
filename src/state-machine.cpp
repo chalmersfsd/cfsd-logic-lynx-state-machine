@@ -172,10 +172,10 @@ int32_t main(int32_t argc, char **argv) {
             uint16_t senderStamp = envelope.senderStamp();
             if (senderStamp == 1502){
                 auto const torqueReq = cluon::extractMessage<opendlv::proxy::TorqueRequest>(std::move(envelope));
-                stateMachine.setTorqueReqLeft((int)round(torqueReq.torque()));
+                stateMachine.setTorqueReqLeft((int16_t)round(torqueReq.torque()));
             }else if (senderStamp == 1503){
                 auto const torqueReq = cluon::extractMessage<opendlv::proxy::TorqueRequest>(std::move(envelope));
-                stateMachine.setTorqueReqRight((int)round(torqueReq.torque()));
+                stateMachine.setTorqueReqRight((int16_t)round(torqueReq.torque()));
             }
         }};
         od4.dataTrigger(opendlv::proxy::TorqueRequest::ID(), onTorqueRequest);
