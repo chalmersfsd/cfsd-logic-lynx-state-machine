@@ -3,9 +3,8 @@ language: cpp
 sudo: required
 branches:
   only:
-  - "/^master$/"
-  - "/^pre-release$/"
-  - "/^v.*$/"
+  - "/^test.*$/"
+  - "/^v[0-9].*$/"
 services:
 - docker
 addons:
@@ -13,23 +12,19 @@ addons:
     update: true
 env:
   global:
-  - BRANCH=${TRAVIS_BRANCH}
-  - TAG=${TRAVIS_TAG}
   - DOCKERHUB='chalmersfsd'
   - IMAGE=`echo ${TRAVIS_REPO_SLUG#*/}`
-  - secure: JULtiqtoJB7jjSkO0HnLsclJFJsKht9dN5YeX8TvGLF3F/zeMAlKc8kNsqCZAYDZEqvAD+r+e6TPtM5OhG1xaTNMiFyKzfmLncNhYtJYp+5+66FjicbASm1a2t4HTLDCrx7T3XI8PD5mc2xpGSoho6jtFRNlQQJ1xT9xkTfT4NsVxZ8R2iYmMT6MzNpu5YY6X/YxNmQ3X+0i3htyspr4pgaLjnSFarbOAdksiUDHoM23GAJt95J2fo+Bww5Dn7m67bm0pc3cxfSsQXxYULeXfhYlSYyYpj1Qbyu2zpm4PO+lFeVtjN7fbK0c8oc3tZdO6p07TjW9f5RfScheu/OIl94MAMiKhcEtI9k7+L5iZ6lCAQwrPtzTyHIC9ySyKR8vdQUTQwLpuFASuBDG/iasryO2QInMW4ZP/8WHUilY4gkkhdb1dfF3i7pLLjlpnlzFqO7sY2knQorZ+6vJZ1gUPtlquEPceHraCpFi3rQ0KEinu2PrnzbsatXo89bJZr7sahTir1EGc6RBiq3NDhXtP8k1juwzHQJhP+QRsLKHtng8Tmq4kBkuSkAfU91RIRdnf61gdM4KJ4IQWjtv7iMYeMGMcGGVFQyoubuROcqHTj/CoRGY9OCrT+XHVnBRR3rUzGsU2VNsYtEuAdDMA6uy+Gs/tpHXISUZUwEnQ3MV5eE=
-  - secure: ni63gvoqw2USNnlGclArlAkDLOILNVQpCglOhc+Cv+5O9ZNB8wpH1Y+p5fXJhSc17FsJLFFUHqAJu3jcad8uO8/pnrMjnUndRnEqV113vTVPQkABwAhB17H3awPEnfd79OXjOSwlhvDMtI5v6IUxIOgXP4qrSlXvD5nuVLdTTiFHoXtWezgLacLfK5orOOfFmAOqHNHmNfc8oMwhs/JcSJXWJlDjqa73dDEjdKvndRU0GmHixGVL9ip2lNhP3PCsS3lQjkvvZDCSFxCvvVJrdUlYzY71ohF98GjQRa7LfVbvvT+6NvNWcwSv78hyGTmnY9o4/J27kLpSQbLVqENY/XpM6PkeGasghJizgDRg3zOdgZUrl6iFGPdkjn47sYsctbuYDyzKsgBC/x74xDQs5eKcPuvisjcBO1VHd2rjWtDTyqDBEH92uggWxvxhVh8g8L3GzIHdo8nFHSLmRPBJgTqUxS1YkhQC/IytNpeuFwVO1nDJNeV+O5w2J3Qg6Sg9ziIuAegA/uGxIL21Cv5j5X0IaklDyk1ujtGYXNB0Z/DK9PN8zLy2Q8ZoENN3y+QXHgbh/dbDOEoCwLeOA2Sz5z1HxYhJk0dpeBlAb0ET5doMY1lirEfjcQhNUQZj0f9PUFJ1yQ3ZQ0ZGld3VGAU7Vlu8DXaXzic6vS3PpEWwDAo=
+  - secure: s+9R+M5+es4lykIRugaIyT9+IVPscrHxRsTO0WQhJkKf9guvM2hEDdt3GiYaa5rHzZv/zR27qd4yJFledPNRWpWGzZIe2DZ+nSlbU1YywK95gSdJD0i+k3fbSaa5cbyCILgL1rjN0B5Y27l9cZCBQ6ZSWOsY58llQHRwceWuSVGnyhJpShVSQOJMRkU7UwwD/JI08b9IypgqftnOoUeYhSj13EO9t/FhbAbyG1w1VqMC0OyCDqN5HeRJSQfFcejI6kFLa/kB3zFFlhM+i2oDYoFS1w6OCUqSzOYYJ3wycVys3zhjry2Of71QmmrYKyQnbb/I9NTXHMR6P4/15PU3u7ijDs3RlqlQbL0qK/fcplY3V2OUyPJNVWWaSNYmVemRssRtXQeyveuZekPy7VpLLXNgLyE69ye/L4+pkvZvLmbkjdNZcspvR8okNPfAHCFROz3ok7P70x11QDpKGVYjp5kK39jnMVJz13mmJPzX4NVZPUyMxd/promoJzm2Ye9XvODCgWIQlkVHoMN7CrwWbNIyJ0UdlNNZOMuYA6qikWB3EVmvJ6GYkvj31r0y/HBxJPm4lXR/m8O4uDEwBd+VKNlman8qHkuDWhlmjBEPAoU1ypnSYmsqixEZcKsNm8gCvBOO9Ne2h5u+r6AcmTV0GFMiXBJsLQtArYRYD02FrgM=
+  - secure: I4PMb0Ask9k8Wnl5BPRIm435bPTbruQWI+NKMbalnuoRStuj3SZL1BvyHTIjhcvOt6YL9MSjKCdyFi9CtucfudYddN9EsYG6nTlNWDIWsK6vjKih9ywRyu/LDM26ovs0jnJBfSWmPzWoC7Z54+WvcdA4TfQQf7m3Zy1U1jJiAOAMpprfbmGPMUO6j23xduppdNNzTLYT3QQ3T6JhzttLTBfuxh4pcLy5WLWaYy4bRE2/X2rbotK6wdP8n5HxoVrTl+OyBKtLhMI8FEnBZWnY2AsZ6y64UBFealdiijXxnIdprA1FYrYpkxmI6jV0/70PhtVstDXF9Ws/MO50eifEDsmdYAcmbGdeN9l+7KgxkkKcbSUTcgBDXS9HPcV8lgW7/nOmWSfmmxSaYHiYyrCjGDOL4Ivlc7OFPCSqZ6MudzHz3M/hrHmRgWEhLnjztsMcGXw2U3aMq47vXS4s9UwO86EAO6NbuN3CfCr73YZNaFyEQzhMecdnm9LwhhvhYMQoiuEh+ob6MpGXuhIP3Q4u0WQjPvutUagqnrxlPuCIELiYVaye7mYsuA2OiIO6yiknzutElwDPZ7kO0n7dlJiifpYgH5O87vtxtwGf8yT4czpwlN3d59OsYVuaTNV02wd/YhzaiJHT2Zi5EcFy7qvyVausL1VCaN4BhTn/Ji5DTO0=
 install:
-- docker build -f Dockerfile.amd64 -t ${IMAGE}:${BRANCH} .
+- docker build -f Dockerfile.amd64 -t ${IMAGE} .
 script: skip
 after_success:
-- if [[ -z "${TAG}" ]]; then echo "This commit hasn't been tagged, will not be pushed
-  to dockerhub"; exit 0; fi
-- docker --version
 - echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-- docker tag ${IMAGE}:${BRANCH} ${DOCKERHUB}/${IMAGE}:${TAG}
-- docker push ${DOCKERHUB}/${IMAGE}:${TAG}
-- echo "${DOCKERHUB}/${IMAGE}:${TAG}"
+- if [[ "${TRAVIS_BRANCH}" == *test* ]]; then docker tag ${IMAGE} ${DOCKERHUB}/${IMAGE}:${TRAVIS_BRANCH}${TRAVIS_BUILD_NUMBER};
+  docker push ${DOCKERHUB}/${IMAGE}:${TRAVIS_BRANCH}${TRAVIS_BUILD_NUMBER}; echo "${DOCKERHUB}/${IMAGE}:${TRAVIS_BRANCH}${TRAVIS_BUILD_NUMBER}";
+  else docker tag ${IMAGE} ${DOCKERHUB}/${IMAGE}:${TRAVIS_BRANCH}; docker push ${DOCKERHUB}/${IMAGE}:${TRAVIS_BRANCH};
+  echo "${DOCKERHUB}/${IMAGE}:${TRAVIS_BRANCH}"; fi
 notifications:
   email:
     on_success: never
