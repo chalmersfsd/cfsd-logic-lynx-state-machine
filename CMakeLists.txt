@@ -19,7 +19,8 @@ project(state-machine)
 
 ################################################################################
 # Defining the relevant versions of OpenDLV Standard Message Set and libcluon.
-set(OPENDLV_STANDARD_MESSAGE_SET opendlv-standard-message-set-v0.9.6.odvd)
+set(OPENDLV_STANDARD_MESSAGE_SET opendlv-standard-message-set-v0.9.7.odvd)
+set(CFSD_EXTENDED_MESSAGE_SET cfsd-extended-message-set-v0.0.1.odvd)
 set(CLUON_COMPLETE cluon-complete-v0.0.114.hpp)
 
 ################################################################################
@@ -67,6 +68,10 @@ add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/opendlv-standard-message-set.hpp
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 COMMAND ${CMAKE_BINARY_DIR}/cluon-msc --cpp --out=${CMAKE_BINARY_DIR}/opendlv-standard-message-set.hpp ${CMAKE_CURRENT_SOURCE_DIR}/src/${OPENDLV_STANDARD_MESSAGE_SET}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/${OPENDLV_STANDARD_MESSAGE_SET} ${CMAKE_BINARY_DIR}/cluon-msc)
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/cfsd-extended-message-set.hpp
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+COMMAND ${CMAKE_BINARY_DIR}/cluon-msc --cpp --out=${CMAKE_BINARY_DIR}/cfsd-extended-message-set.hpp ${CMAKE_CURRENT_SOURCE_DIR}/src/${CFSD_EXTENDED_MESSAGE_SET}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/${CFSD_EXTENDED_MESSAGE_SET} ${CMAKE_BINARY_DIR}/cluon-msc)
 # Add current build directory as include directory as it contains generated files.
 include_directories(SYSTEM ${CMAKE_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -76,7 +81,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 add_library(${PROJECT_NAME}-core OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/logic-state-machine.cpp)
 # Add dependency to generate .hpp file.
 add_custom_target(generate_opendlv_standard_message_set_hpp DEPENDS ${CMAKE_BINARY_DIR}/opendlv-standard-message-set.hpp)
+add_custom_target(generate_cfsd_extended_message_set_hpp DEPENDS ${CMAKE_BINARY_DIR}/cfsd-extended-message-set.hpp)
 add_dependencies(${PROJECT_NAME}-core generate_opendlv_standard_message_set_hpp)
+add_dependencies(${PROJECT_NAME}-core generate_cfsd_extended_message_set_hpp)
 set(LIBRARIES Threads::Threads)
 
 ################################################################################
