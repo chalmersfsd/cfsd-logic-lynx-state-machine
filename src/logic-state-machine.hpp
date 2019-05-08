@@ -195,6 +195,7 @@ class StateMachine {
     int16_t em_torqueReqLeft;
     int16_t em_torqueReqRight;
 
+  public:
     // Senderstamps offset
     const uint32_t m_senderStampOffsetGpio = 1000;
     const uint32_t m_senderStampOffsetAnalog = 1200;
@@ -202,13 +203,14 @@ class StateMachine {
 
     // Broadcast
     const uint32_t m_senderStampResInitialize = 1099;
-    const uint32_t m_senderStampAsState = 1401;
-    const uint32_t m_senderStampRTD = 1404;
-    const uint32_t m_senderStampEBSFault = 1405;
-    const uint32_t m_senderStampResStatus = 1407;
-    const uint32_t m_senderStampSteeringState = 1413;
-    const uint32_t m_senderStampEbsState = 1414;
-    const uint32_t m_senderStampServiceValveState = 1415;
+    const uint32_t m_senderStampAsState = 2101;
+    const uint32_t m_senderStampRTD = 2104;
+    const uint32_t m_senderStampEBSFault = 2105;
+    const uint32_t m_senderStampResStatus = 2107;
+    const uint32_t m_senderStampBrakeReq = 2150;
+    const uint32_t m_senderStampSteeringState = 2113;
+    const uint32_t m_senderStampEbsState = 2114;
+    const uint32_t m_senderStampServiceValveState = 2115;
     const uint32_t m_senderStampTorqueLeft = 1502;
     const uint32_t m_senderStampTorqueRight = 1503;
 
