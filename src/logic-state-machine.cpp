@@ -623,6 +623,12 @@ void StateMachine::sendMessages()
   msgTorqueReq.torque(m_torqueReqRightCan);
   m_od4.send(msgTorqueReq, sampleTime, senderStamp);
 
+  opendlv::cfsdProxy::TorqueRequestDual msgTorqueReqDual;
+  senderStamp = 5515;
+  msgTorqueReqDual.torqueLeft(m_torqueReqLeftCan);
+  msgTorqueReqDual.torqueRight(m_torqueReqRightCan);
+  m_od4.send(msgTorqueReqDual, sampleTime, senderStamp);
+
   m_refreshMsg = m_flash2Hz;
 }
 

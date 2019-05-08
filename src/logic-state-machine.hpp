@@ -19,6 +19,7 @@
 #define STATEMACHINE_H
 
 #include "opendlv-standard-message-set.hpp"
+#include "cfsd-extended-message-set.hpp"
 
 #include <chrono>
 #include <cstdint>
