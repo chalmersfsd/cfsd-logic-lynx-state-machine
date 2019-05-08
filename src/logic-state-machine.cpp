@@ -725,15 +725,6 @@ void StateMachine::stopMission()
 
 bool StateMachine::getInitialized() {return m_initialized;}
 asState StateMachine::getAsState() {return m_asState;}
-uint32_t StateMachine::getSenderStampOffsetAnalog() {return m_senderStampOffsetAnalog;}
-uint32_t StateMachine::getSenderStampOffsetGpio() {return m_senderStampOffsetGpio;}
-uint16_t StateMachine::getAnalogStampEbsLine() {return m_analogStampEbsLine;}
-uint16_t StateMachine::getAnalogStampServiceTank() {return m_analogStampServiceTank;}
-uint16_t StateMachine::getAnalogStampEbsActuator() {return m_analogStampEbsActuator;}
-uint16_t StateMachine::getAnalogStampPressureReg() {return m_analogStampPressureReg;}
-uint16_t StateMachine::getGpioStampEbsOk() {return m_gpioStampEbsOk;}
-uint16_t StateMachine::getGpioStampAsms() {return m_gpioStampAsms;}
-uint16_t StateMachine::getGpioStampClampSensor() {return m_gpioStampClampSensor;}
 
 void StateMachine::setLastUpdateAnalog(cluon::data::TimeStamp lastUpdateAnalog)
 {

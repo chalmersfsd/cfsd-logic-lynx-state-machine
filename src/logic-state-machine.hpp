@@ -92,15 +92,6 @@ class StateMachine {
     void body();
     bool getInitialized();
     asState getAsState();
-    uint32_t getSenderStampOffsetAnalog();
-    uint32_t getSenderStampOffsetGpio();
-    uint16_t getAnalogStampEbsLine();
-    uint16_t getAnalogStampServiceTank();
-    uint16_t getAnalogStampEbsActuator();
-    uint16_t getAnalogStampPressureReg();
-    uint16_t getGpioStampEbsOk();
-    uint16_t getGpioStampAsms();
-    uint16_t getGpioStampClampSensor();
     void setLastUpdateAnalog(cluon::data::TimeStamp time);
     void setLastUpdateGpio(cluon::data::TimeStamp time);
     void setMission(uint16_t mission);
@@ -197,22 +188,31 @@ class StateMachine {
 
   public:
     // Senderstamps offset
-    const uint32_t m_senderStampOffsetGpio = 1000;
-    const uint32_t m_senderStampOffsetAnalog = 1200;
-    const uint32_t m_senderStampOffsetPwm = 1300;
+    const uint16_t m_senderStampOffsetGpio = 1000;
+    const uint16_t m_senderStampOffsetAnalog = 1200;
+    const uint16_t m_senderStampOffsetPwm = 1300;
 
     // Broadcast
-    const uint32_t m_senderStampResInitialize = 1099;
-    const uint32_t m_senderStampAsState = 2101;
-    const uint32_t m_senderStampRTD = 2104;
-    const uint32_t m_senderStampEBSFault = 2105;
-    const uint32_t m_senderStampResStatus = 2107;
-    const uint32_t m_senderStampBrakeReq = 2150;
-    const uint32_t m_senderStampSteeringState = 2113;
-    const uint32_t m_senderStampEbsState = 2114;
-    const uint32_t m_senderStampServiceValveState = 2115;
-    const uint32_t m_senderStampTorqueLeft = 1502;
-    const uint32_t m_senderStampTorqueRight = 1503;
+    const uint16_t m_senderStampResInitialize = 1099;
+    const uint16_t m_senderStampAsState = 2101;
+    const uint16_t m_senderStampRTD = 2104;
+    const uint16_t m_senderStampEBSFault = 2105;
+    const uint16_t m_senderStampBrakeReq = 2150;
+    const uint16_t m_senderStampSteeringState = 2113;
+    const uint16_t m_senderStampEbsState = 2114;
+    const uint16_t m_senderStampServiceValveState = 2115;
+    const uint16_t m_senderStampTorqueLeft = 1502;
+    const uint16_t m_senderStampTorqueRight = 1503;
+
+    const uint16_t m_senderStampTorqueIn = 2101;
+
+    // Input from RES proxy
+    const uint16_t m_senderStampResStatus = 1801;
+    const uint16_t m_senderStampResStop = 1802;
+    const uint16_t m_senderStampResButtons = 1804;
+
+    // Input from CAN proxy
+    const uint16_t m_senderStampAsMission = 1906;
 
     // Depends on pin value in opendlv-device-stm32-lynx
     const uint16_t m_gpioStampEbsOk = 99; // TODO: set back to 49 when HV is in
