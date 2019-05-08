@@ -34,7 +34,7 @@ TEST_CASE("Test AS state at startup") {
 
     StateMachine stateMachine(od4, od4Analog, od4Gpio, od4Pwm, 0);
     stateMachine.body();
-    asState state = stateMachine.getCurrentState();
+    asState state = stateMachine.getAsState();
 
     REQUIRE(state == asState::AS_OFF);
 }
@@ -65,7 +65,7 @@ TEST_CASE("Test AS transitions") {
         for (int i = 0; i < 10; i++) {
             stateMachine.body();
         }
-        asState state = stateMachine.getCurrentState();
+        asState state = stateMachine.getAsState();
 
         REQUIRE(state == asState::AS_READY);
     }

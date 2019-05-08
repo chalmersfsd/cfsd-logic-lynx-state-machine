@@ -89,8 +89,8 @@ class StateMachine {
 
   public:
     void body();
-    asState getCurrentState();
     bool getInitialized();
+    asState getAsState();
     uint32_t getSenderStampOffsetAnalog();
     uint32_t getSenderStampOffsetGpio();
     uint16_t getAnalogStampEbsLine();
@@ -130,10 +130,10 @@ class StateMachine {
     cluon::data::TimeStamp m_lastUpdateAnalog;
     cluon::data::TimeStamp m_lastUpdateGpio;
     asState m_prevState;
-    asState m_currentState;
+    asState m_asState;
     ebsState m_ebsState;
     serviceBrakeState m_brakeState;
-    ebsInitState m_currentStateEbsInit;
+    ebsInitState m_ebsInitState;
     uint64_t m_lastStateTransition;
     uint64_t m_lastEbsInitTransition;
     uint64_t m_nextFlashTime;
@@ -148,8 +148,6 @@ class StateMachine {
     uint32_t m_redDutyOld;
     uint16_t m_torqueReqLeftCan;
     uint16_t m_torqueReqRightCan;
-    uint8_t m_brakeActual; // TODO: Check what these two were used for
-    uint8_t m_brakeTarget; // TODO: Check what these two were used for
     bool m_initialized;
     bool m_compressor;
     bool m_compressorOld;
@@ -175,7 +173,7 @@ class StateMachine {
     bool m_verbose;
 
     // Received from other microservices
-    asMission em_currentMission;
+    asMission em_mission;
     bool em_asms;
     bool em_tsOn; // tsOn shares the same signal as ebsOk for now. TODO: Change to other signal when available
     bool em_resGoSignal;
@@ -203,7 +201,7 @@ class StateMachine {
 
     // Broadcast
     const uint32_t m_senderStampResInitialize = 1099;
-    const uint32_t m_senderStampCurrentState = 1401;
+    const uint32_t m_senderStampAsState = 1401;
     const uint32_t m_senderStampRTD = 1404;
     const uint32_t m_senderStampEBSFault = 1405;
     const uint32_t m_senderStampResStatus = 1407;
@@ -212,8 +210,6 @@ class StateMachine {
     const uint32_t m_senderStampServiceValveState = 1415;
     const uint32_t m_senderStampTorqueLeft = 1502;
     const uint32_t m_senderStampTorqueRight = 1503;
-    const uint32_t m_senderStampBrakeTarget = 1509;
-    const uint32_t m_senderStampBrakeActual = 1510;
 
     // Depends on pin value in opendlv-device-stm32-lynx
     const uint16_t m_gpioStampEbsOk = 99; // TODO: set back to 49 when HV is in
