@@ -615,16 +615,8 @@ void StateMachine::sendMessages()
   // Torque requests to CAN proxy
   opendlv::proxy::TorqueRequest msgTorqueReq;
 
-  senderStamp = m_senderStampTorqueLeft;
-  msgTorqueReq.torque(m_torqueReqLeftCan);
-  m_od4.send(msgTorqueReq, sampleTime, senderStamp);
-
-  senderStamp = m_senderStampTorqueRight;
-  msgTorqueReq.torque(m_torqueReqRightCan);
-  m_od4.send(msgTorqueReq, sampleTime, senderStamp);
-
   opendlv::cfsdProxy::TorqueRequestDual msgTorqueReqDual;
-  senderStamp = 5515;
+  senderStamp = m_senderStampTorqueOut;
   msgTorqueReqDual.torqueLeft(m_torqueReqLeftCan);
   msgTorqueReqDual.torqueRight(m_torqueReqRightCan);
   m_od4.send(msgTorqueReqDual, sampleTime, senderStamp);

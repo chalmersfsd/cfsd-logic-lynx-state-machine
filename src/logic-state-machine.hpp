@@ -194,6 +194,7 @@ class StateMachine {
 
     // Broadcast
     const uint16_t m_senderStampResInitialize = 1099;
+    const uint16_t m_senderStampTorqueOut = 1910;
     const uint16_t m_senderStampAsState = 2101;
     const uint16_t m_senderStampRTD = 2104;
     const uint16_t m_senderStampEBSFault = 2105;
@@ -201,9 +202,8 @@ class StateMachine {
     const uint16_t m_senderStampSteeringState = 2113;
     const uint16_t m_senderStampEbsState = 2114;
     const uint16_t m_senderStampServiceValveState = 2115;
-    const uint16_t m_senderStampTorqueLeft = 1502;
-    const uint16_t m_senderStampTorqueRight = 1503;
 
+    // Torque senderstamps
     const uint16_t m_senderStampTorqueIn = 2101;
 
     // Input from RES proxy
@@ -215,7 +215,7 @@ class StateMachine {
     const uint16_t m_senderStampAsMission = 1906;
 
     // Depends on pin value in opendlv-device-stm32-lynx
-    const uint16_t m_gpioStampEbsOk = 99; // TODO: set back to 49 when HV is in
+    const uint16_t m_gpioStampEbsOk = 49;
     const uint16_t m_gpioStampAsms = 115;
     const uint16_t m_gpioStampClampSensor = 112;
 
