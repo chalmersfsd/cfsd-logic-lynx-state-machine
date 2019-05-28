@@ -8,18 +8,41 @@ This microservice provides the state machine for Lynx. Receives messages from di
 ### Build
 AMD64: docker build -f Dockerfile.amd64 -t chalmersfsd/state-machine:v0.0.0 .
 
+### Enumerated states
+- asState:
+  - AS_OFF
+  - AS_READY,
+  - AS_DRIVING
+  - AS_FINISHED
+  - AS_EMERGENCY
+  - AS_MANUAL
+
+- asMission:
+  - AMI_NONE
+  - AMI_ACCELERATION
+  - AMI_SKIDPAD
+  - AMI_TRACKDRIVE
+  - AMI_AUTOCROSS
+  - AMI_BRAKETEST
+  - AMI_INSPECTION
+  - AMI_MANUAL
+  - AMI_TEST
+
+- ebsState: 
+  - EBS_UNAVAILABLE
+  - EBS_ARMED
+  - EBS_ACTIVATED
+
 ### Input
 - opendlv::proxy::SwitchStateReading
-  - EBS sound               (1044)
+  - EBS speaker             (1044)
   - EBS okay true/false     (1049)
   - Steering clamp extended (1112)
   - ASMS on/off             (1115)
   - TS on/off               (???)
-  - Finish signal           (1403)
-  - RTD                     (1404)
-  - RES stop signal         (1406)
-  - RES status              (1408)
-  - Go signal               (1410)
+  - RES status              (1801)
+  - RES stop signal         (1802)
+  - RES buttons             (1804)
 
 - opendlv::proxy::GroundSpeedReading
   - Vehicle Speed (???)
@@ -31,14 +54,13 @@ or
   - Wheel FL (1904)
 
 - opendlv::proxy::PressureReading
-  - Pneumatic pressure: EBS actuator      (1203)
   - Pneumatic pressure: EBS line          (1201)
   - Pneumatic pressure: service tank      (1202)
+  - Pneumatic pressure: EBS actuator      (1203)
   - Pneumatic pressure: service regulator (1205)
 
-- opendlv::proxy::TorqueRequest
-  - Torque request right  (1501)
-  - Torque request left   (1500)
+- opendlv::cfsdProxy::TorqueRequestDual
+  - Torque request  (2101)
 
 - opendlv::proxy::GroundSteeringReading
   - Steering position       (1200)
@@ -61,21 +83,14 @@ or
   - ASSI blue signal  (1300)
 
 - opendlv::proxy::SwitchStateReading (od4)
-  - Current AS state           (1401)
-  - RTD                        (1404)
-  - EBS fault                  (1405)
-  - Steering state             (1413)
-  - EBS state                  (1414)
-  - Service brake valve state  (1415)
+  - RTD                        (1904)
+  - Current AS state           (2101)
+  - EBS fault                  (2105)
+  - EBS state                  (2114)
+  - Service brake valve state  (2115)
 
-- opendlv::proxy::TorqueRequest (od4)
-  - Torque request left  (1502)
-  - Torque request right (1503)
+- opendlv::cfsdProxy::TorqueRequestDual
+  - Torque request  (1910)
 
 - opendlv::proxy::PressureReading (od4)
   - Brake Target (1509)
-  - Brake Actual (1510)
-
-- Unclear if needed / used:
-  - m_ebsTest (od4Gpio)
-  - m_serviceBrake (od4Gpio)
