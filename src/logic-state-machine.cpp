@@ -129,8 +129,8 @@ void StateMachine::body()
 {
   bool frontNodeOk = cluon::time::toMicroseconds(m_lastUpdateAnalog) != 0 && cluon::time::toMicroseconds(m_lastUpdateGpio) != 0;
   // Check if we're receiving data from AS node
-  if(!frontNodeOk || !em_resInitialized){
-    std::cout << "Front node status: " << (frontNodeOk ? "On\n" : "Off\n") << "RES status: " << (em_resInitialized ? "On" : "Off") << std::endl;
+  if(!frontNodeOk){
+    std::cout << "Front node status: " << (frontNodeOk ? "On\n" : "Off\n") << std::endl;
     return;
   }
   m_modulesRunning = true;
@@ -141,6 +141,8 @@ void StateMachine::body()
       m_modulesRunning = false;
       std::cout << "[ASS-ERROR] Module has crashed. Last gpio update:" << (threadTime-cluon::time::toMicroseconds(m_lastUpdateGpio)) << "\t Last analog update: " << (threadTime-cluon::time::toMicroseconds(m_lastUpdateAnalog)) << std::endl;
   }
+
+  std::cout << "Last gpio update:" << (threadTime-cluon::time::toMicroseconds(m_lastUpdateGpio)) / 1000 << " ms \t Last analog update: " << (threadTime-cluon::time::toMicroseconds(m_lastUpdateAnalog)) / 1000 << " ms"<< std::endl;
 
   if (em_ebsOk) { // TODO: Remove this when tsOn signal has been added to AS node
     em_tsOn = true;
