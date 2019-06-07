@@ -40,6 +40,8 @@ StateMachine::StateMachine(cluon::OD4Session &od4, cluon::OD4Session &od4Analog,
   , m_ebsInitState{ebsInitState::EBS_INIT_ENTRY}
   , m_lastStateTransition{0U}
   , m_lastEbsInitTransition{0U}
+  , m_analogDelay{0U}
+  , m_gpioDelay{0U}
   , m_nextFlashTime{0U}
   , m_ebsActivatedTime{0U}
   , m_brakeDuty{0U}
@@ -140,9 +142,13 @@ void StateMachine::body()
 {
   // Check if we're continuously receiving data from AS node
   uint64_t lastUpdateAnalog, lastUpdateGpio;
+  uint64_t analogDelayReal, gpioDelayReal;
   {
     std::lock_guard<std::mutex> lock1(m_analogMutex);
     std::lock_guard<std::mutex> lock2(m_gpioMutex);
+
+    analogDelayReal = m_analogDelay;
+    gpioDelayReal = m_gpioDelay;
 
     lastUpdateAnalog = cluon::time::toMicroseconds(m_lastUpdateAnalog);
     lastUpdateGpio = cluon::time::toMicroseconds(m_lastUpdateGpio);
@@ -164,7 +170,7 @@ void StateMachine::body()
       std::cout << "[ASS-ERROR] Module has crashed. Last gpio update:" << gpioDelay << "\t Last analog update: " << analogDelay << std::endl;
   }
 
-  std::cout << "Thread GPIO: " << gpioDelay / 1000 << " ms | Analog: " << analogDelay / 1000 << " ms" << std::endl;
+  std::cout << "Thread GPIO: " << gpioDelayReal / 1000 << " ms | Analog: " << analogDelayReal / 1000 << " ms" << std::endl;
 
   if (em_ebsOk) { // TODO: Remove this when tsOn signal has been added to AS node
     em_tsOn = true;
@@ -745,12 +751,14 @@ asState StateMachine::getAsState() {return m_asState;}
 void StateMachine::setLastUpdateAnalog(cluon::data::TimeStamp lastUpdateAnalog)
 {
   std::lock_guard<std::mutex> lock(m_analogMutex);
+  m_analogDelay = cluon::time::toMicroseconds(lastUpdateAnalog) - cluon::time::toMicroseconds(m_lastUpdateAnalog);
   m_lastUpdateAnalog = lastUpdateAnalog;
 }
 
 void StateMachine::setLastUpdateGpio(cluon::data::TimeStamp lastUpdateGpio)
 {
   std::lock_guard<std::mutex> lock(m_gpioMutex);
+  m_gpioDelay = cluon::time::toMicroseconds(lastUpdateGpio) - cluon::time::toMicroseconds(m_lastUpdateGpio);
   m_lastUpdateGpio = lastUpdateGpio;
 }
 
