@@ -24,6 +24,7 @@
 #include <chrono>
 #include <cstdint>
 #include <string>
+#include <mutex>
 
 enum asState {
     AS_OFF,
@@ -128,6 +129,8 @@ class StateMachine {
     ebsInitState m_ebsInitState;
     uint64_t m_lastStateTransition;
     uint64_t m_lastEbsInitTransition;
+    uint64_t m_analogDelay;
+    uint64_t m_gpioDelay;
     uint64_t m_nextFlashTime;
     uint64_t m_ebsActivatedTime;
     uint32_t m_brakeDuty;
@@ -185,6 +188,10 @@ class StateMachine {
     uint32_t em_brakeDutyRequest;
     int16_t em_torqueReqLeft;
     int16_t em_torqueReqRight;
+
+    // Mutexes
+    std::mutex m_analogMutex;
+    std::mutex m_gpioMutex;
 
   public:
     // Senderstamps offset

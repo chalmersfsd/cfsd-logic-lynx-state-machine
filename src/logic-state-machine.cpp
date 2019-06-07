@@ -40,6 +40,8 @@ StateMachine::StateMachine(cluon::OD4Session &od4, cluon::OD4Session &od4Analog,
   , m_ebsInitState{ebsInitState::EBS_INIT_ENTRY}
   , m_lastStateTransition{0U}
   , m_lastEbsInitTransition{0U}
+  , m_analogDelay{}
+  , m_gpioDelay{}
   , m_nextFlashTime{0U}
   , m_ebsActivatedTime{0U}
   , m_brakeDuty{0U}
@@ -96,6 +98,9 @@ StateMachine::StateMachine(cluon::OD4Session &od4, cluon::OD4Session &od4Analog,
   , em_brakeDutyRequest{0U}
   , em_torqueReqLeft{0}
   , em_torqueReqRight{0}
+
+  , m_analogMutex{}
+  , m_gpioMutex{}
 {
   setUp();
 }
@@ -117,7 +122,15 @@ void StateMachine::setUp()
   opendlv::proxy::SwitchStateRequest msgCan;
   msgCan.state(m_initialized);
   m_od4.send(msgCan, sampleTime, senderStamp);
-  
+
+  // Initialize the front node delay trackers
+  {
+    std::lock_guard<std::mutex> lock1(m_analogMutex);
+    std::lock_guard<std::mutex> lock2(m_gpioMutex);
+    m_lastUpdateAnalog = cluon::time::now();
+    m_lastUpdateGpio = cluon::time::now();
+  }
+
   std::cout << "done." << std::endl;
 }
 
@@ -136,13 +149,20 @@ void StateMachine::body()
   m_modulesRunning = true;
 
   // Check if we're continuously receiving data from AS node
-  int64_t threadTime = cluon::time::toMicroseconds(cluon::time::now());
-  if((((threadTime-cluon::time::toMicroseconds(m_lastUpdateAnalog)) > 500000) || ((threadTime-cluon::time::toMicroseconds(m_lastUpdateGpio)) > 1000000)) && m_modulesRunning){
+  uint64_t analogDelay, gpioDelay;
+  {
+    std::lock_guard<std::mutex> lock1(m_analogMutex);
+    std::lock_guard<std::mutex> lock2(m_gpioMutex);
+
+    analogDelay = m_analogDelay;
+    gpioDelay = m_gpioDelay;
+  }
+  if( (analogDelay > 500000 || gpioDelay > 1000000) && m_modulesRunning){
       m_modulesRunning = false;
-      std::cout << "[ASS-ERROR] Module has crashed. Last gpio update:" << (threadTime-cluon::time::toMicroseconds(m_lastUpdateGpio)) << "\t Last analog update: " << (threadTime-cluon::time::toMicroseconds(m_lastUpdateAnalog)) << std::endl;
+      std::cout << "[ASS-ERROR] Module has crashed. Last gpio update:" << gpioDelay << "\t Last analog update: " << analogDelay << std::endl;
   }
 
-  std::cout << "Last gpio update:" << (threadTime-cluon::time::toMicroseconds(m_lastUpdateGpio)) / 1000 << " ms \t Last analog update: " << (threadTime-cluon::time::toMicroseconds(m_lastUpdateAnalog)) / 1000 << " ms"<< std::endl;
+  std::cout << "Last gpio update:" << analogDelay / 1000 << " ms \t Last analog update: " << gpioDelay / 1000 << " ms"<< std::endl;
 
   if (em_ebsOk) { // TODO: Remove this when tsOn signal has been added to AS node
     em_tsOn = true;
@@ -722,11 +742,15 @@ asState StateMachine::getAsState() {return m_asState;}
 
 void StateMachine::setLastUpdateAnalog(cluon::data::TimeStamp lastUpdateAnalog)
 {
+  std::lock_guard<std::mutex> lock(m_analogMutex);
+  m_analogDelay = cluon::time::toMicroseconds(lastUpdateAnalog) - cluon::time::toMicroseconds(m_lastUpdateAnalog);
   m_lastUpdateAnalog = lastUpdateAnalog;
 }
 
 void StateMachine::setLastUpdateGpio(cluon::data::TimeStamp lastUpdateGpio)
 {
+  std::lock_guard<std::mutex> lock(m_gpioMutex);
+  m_gpioDelay = cluon::time::toMicroseconds(lastUpdateGpio) - cluon::time::toMicroseconds(m_lastUpdateGpio);
   m_lastUpdateGpio = lastUpdateGpio;
 }
 
