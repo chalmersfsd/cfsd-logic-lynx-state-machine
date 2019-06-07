@@ -55,28 +55,35 @@ int32_t main(int32_t argc, char **argv) {
             }
             uint16_t senderStamp = envelope.senderStamp()-stateMachine.m_senderStampOffsetAnalog;
 
-            if (senderStamp == stateMachine.m_analogStampEbsActuator){
+            if (senderStamp == stateMachine.m_analogStampEbsActuator) {
                 auto analogInput = cluon::extractMessage<opendlv::proxy::PressureReading>(std::move(envelope));
                 stateMachine.setPressureEbsAct(analogInput.pressure());
-                if(VERBOSE_DATA)
+                stateMachine.setLastUpdateAnalog(cluon::time::now());
+                if(VERBOSE_DATA) {
                     std::cout << "[LOGIC-ASS-PRESSURE-EBS-ACT] Pressure reading:" << analogInput.pressure() << std::endl;
-            }else if (senderStamp == stateMachine.m_analogStampEbsLine){
+                }
+            } else if (senderStamp == stateMachine.m_analogStampEbsLine){
                 auto analogInput = cluon::extractMessage<opendlv::proxy::PressureReading>(std::move(envelope));
                 stateMachine.setPressureEbsLine(analogInput.pressure());
-                if(VERBOSE_DATA)
+                stateMachine.setLastUpdateAnalog(cluon::time::now());
+                if(VERBOSE_DATA) {
                     std::cout << "[LOGIC-ASS-PRESSURE-EBS-LINE] Pressure reading:" << analogInput.pressure() << std::endl;
-            }else if (senderStamp == stateMachine.m_analogStampServiceTank){
+                }
+            } else if (senderStamp == stateMachine.m_analogStampServiceTank) {
                 auto analogInput = cluon::extractMessage<opendlv::proxy::PressureReading>(std::move(envelope));
                 stateMachine.setPressureServiceTank(analogInput.pressure());
-                if(VERBOSE_DATA)
+                stateMachine.setLastUpdateAnalog(cluon::time::now());
+                if(VERBOSE_DATA) {
                     std::cout << "[LOGIC-ASS-PRESSURE-SERVICE-TANK] Pressure reading:" << analogInput.pressure() << std::endl;
-            }else if (senderStamp == stateMachine.m_analogStampPressureReg){
+                }
+            } else if (senderStamp == stateMachine.m_analogStampPressureReg) {
                 auto analogInput = cluon::extractMessage<opendlv::proxy::PressureReading>(std::move(envelope));
                 stateMachine.setPressureServiceReg(analogInput.pressure());
-                if(VERBOSE_DATA)
+                stateMachine.setLastUpdateAnalog(cluon::time::now());
+                if(VERBOSE_DATA) {
                     std::cout << "[LOGIC-ASS-PRESSURE-SERVICE-REGULATOR] Pressure reading:" << analogInput.pressure() << std::endl;
+                }
             }
-            stateMachine.setLastUpdateAnalog(cluon::time::now());
         }};
         od4Analog.dataTrigger(opendlv::proxy::PressureReading::ID(), onPressureReading);
 
@@ -86,17 +93,19 @@ int32_t main(int32_t argc, char **argv) {
                 return;
             }
             uint16_t senderStamp = envelope.senderStamp()-stateMachine.m_senderStampOffsetGpio;
-            if (senderStamp == stateMachine.m_gpioStampEbsOk){
+            if (senderStamp == stateMachine.m_gpioStampEbsOk) {
                 auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
                 stateMachine.setEbsOk(gpioState.state());
-            }else if (senderStamp == stateMachine.m_gpioStampAsms){
+                stateMachine.setLastUpdateGpio(cluon::time::now());
+            } else if (senderStamp == stateMachine.m_gpioStampAsms) {
                 auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
                 stateMachine.setAsms(gpioState.state());
-            }else if (senderStamp == stateMachine.m_gpioStampClampSensor){
+                stateMachine.setLastUpdateGpio(cluon::time::now());
+            } else if (senderStamp == stateMachine.m_gpioStampClampSensor) {
                 auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
                 stateMachine.setClampExtended(gpioState.state());
+                stateMachine.setLastUpdateGpio(cluon::time::now());
             }
-            stateMachine.setLastUpdateGpio(cluon::time::now());
         }};
         od4Gpio.dataTrigger(opendlv::proxy::SwitchStateReading::ID(), onSwitchStateReadingGpio);
 

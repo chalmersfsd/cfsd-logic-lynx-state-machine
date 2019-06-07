@@ -129,8 +129,6 @@ class StateMachine {
     ebsInitState m_ebsInitState;
     uint64_t m_lastStateTransition;
     uint64_t m_lastEbsInitTransition;
-    uint64_t m_analogDelay;
-    uint64_t m_gpioDelay;
     uint64_t m_nextFlashTime;
     uint64_t m_ebsActivatedTime;
     uint32_t m_brakeDuty;
