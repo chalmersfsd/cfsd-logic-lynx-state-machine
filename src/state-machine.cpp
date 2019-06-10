@@ -89,6 +89,8 @@ int32_t main(int32_t argc, char **argv) {
         {
             std::cout << "GPIO in trigger: " << cluon::time::toMicroseconds(cluon::time::now()) << std::endl;
             uint16_t senderStamp = envelope.senderStamp()-stateMachine.m_senderStampOffsetGpio;
+
+            std::cout << "GPIO senderstamp: " << senderStamp << std::endl;
             if (senderStamp == stateMachine.m_gpioStampEbsOk) {
                 auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
                 stateMachine.setEbsOk(gpioState.state());
