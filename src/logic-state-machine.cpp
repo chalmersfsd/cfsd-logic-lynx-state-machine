@@ -125,7 +125,6 @@ void StateMachine::step()
   // ----------------------------- INITIAL CHECKS -----------------------------
   // Check if we're continuously receiving data from AS node
   uint64_t lastUpdateAnalog, lastUpdateGpio;
-  uint64_t analogDelayReal, gpioDelayReal;
   bool ebsOk, resGoSignal, clampExtended;
   float steerPosition, steerPositionRack;
   {
