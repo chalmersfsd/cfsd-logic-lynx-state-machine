@@ -33,7 +33,7 @@ TEST_CASE("Test AS state at startup") {
     cluon::OD4Session od4Pwm{111};
 
     StateMachine stateMachine(od4, od4Analog, od4Gpio, od4Pwm, 0);
-    stateMachine.body();
+    stateMachine.step();
     asState state = stateMachine.getAsState();
 
     REQUIRE(state == asState::AS_OFF);
@@ -63,7 +63,7 @@ TEST_CASE("Test AS transitions") {
         stateMachine.setMission(asMission::AMI_ACCELERATION);
 
         for (int i = 0; i < 10; i++) {
-            stateMachine.body();
+            stateMachine.step();
         }
         asState state = stateMachine.getAsState();
 
@@ -94,7 +94,7 @@ TEST_CASE("Test AS transitions") {
         }
 
         stateMachine.setGoSignal(true);
-        stateMachine.body();
+        stateMachine.step();
        
         asState state = stateMachine.getCurrentState();
 
@@ -105,7 +105,7 @@ TEST_CASE("Test AS transitions") {
         stateMachine.setVehicleSpeed(0.0f);
         stateMachine.setFinishSignal(true);
 
-        stateMachine.body();
+        stateMachine.step();
         asState state = stateMachine.getCurrentState();
 
         REQUIRE(state == asState::AS_FINISHED);
@@ -116,7 +116,7 @@ TEST_CASE("Test AS transitions") {
         stateMachine.setPressureEbsAct(0.0f);
         stateMachine.setPressureServiceReg(0.0f);
 
-        stateMachine.body();
+        stateMachine.step();
         asState state = stateMachine.getCurrentState();
 
         REQUIRE(state == asState::AS_OFF);

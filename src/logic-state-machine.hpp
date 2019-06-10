@@ -81,17 +81,13 @@ class StateMachine {
   private:
     void setUp();
     void tearDown();
-    void ebsInit();
     void brakeUpdate();
     void stateUpdate();
     void setAssi();
     void sendMessages();
-    void runMission();
-    void stopMission();
 
   public:
-    void body();
-    bool getInitialized();
+    void step();
     asState getAsState();
     void setLastUpdateAnalog(cluon::data::TimeStamp time);
     void setLastUpdateGpio(cluon::data::TimeStamp time);
@@ -111,8 +107,7 @@ class StateMachine {
     void setSteerPosition(float pos);
     void setSteerPositionRack(float pos);
     void setBrakeDutyCycle(uint32_t duty);
-    void setTorqueReqLeft(int16_t torque);
-    void setTorqueReqRight(int16_t torque);
+    void setTorqueRequest(int16_t torqueRight, int16_t torqueLeft);
     void setResStatus(bool status);
 
   private:
@@ -120,8 +115,6 @@ class StateMachine {
     cluon::OD4Session &m_od4Analog;
     cluon::OD4Session &m_od4Gpio;
     cluon::OD4Session &m_od4Pwm;
-    cluon::data::TimeStamp m_lastUpdateAnalog;
-    cluon::data::TimeStamp m_lastUpdateGpio;
     asState m_prevState;
     asState m_asState;
     ebsState m_ebsState;
@@ -129,8 +122,6 @@ class StateMachine {
     ebsInitState m_ebsInitState;
     uint64_t m_lastStateTransition;
     uint64_t m_lastEbsInitTransition;
-    uint64_t m_analogDelay;
-    uint64_t m_gpioDelay;
     uint64_t m_nextFlashTime;
     uint64_t m_ebsActivatedTime;
     uint32_t m_brakeDuty;
@@ -141,9 +132,8 @@ class StateMachine {
     uint32_t m_greenDutyOld;
     uint32_t m_redDuty;
     uint32_t m_redDutyOld;
-    uint16_t m_torqueReqLeftCan;
-    uint16_t m_torqueReqRightCan;
-    bool m_initialized;
+    int16_t m_torqueReqLeftCan;
+    int16_t m_torqueReqRightCan;
     bool m_compressor;
     bool m_compressorOld;
     bool m_modulesRunning;
@@ -155,7 +145,6 @@ class StateMachine {
     bool m_ebsFault;
     bool m_flash2Hz;
     bool m_rtd;
-    bool m_firstCycleAsOff;
     bool m_finished;
     bool m_finishedOld;
     bool m_shutdown;
@@ -168,6 +157,8 @@ class StateMachine {
     bool m_verbose;
 
     // Received from other microservices
+    cluon::data::TimeStamp em_lastUpdateAnalog;
+    cluon::data::TimeStamp em_lastUpdateGpio;
     asMission em_mission;
     bool em_asms;
     bool em_tsOn; // tsOn shares the same signal as ebsOk for now. TODO: Change to other signal when available
@@ -189,9 +180,8 @@ class StateMachine {
     int16_t em_torqueReqLeft;
     int16_t em_torqueReqRight;
 
-    // Mutexes
-    std::mutex m_analogMutex;
-    std::mutex m_gpioMutex;
+    // Resource mutex for all data set by data triggers
+    std::mutex m_resourceMutex;
 
   public:
     // Senderstamps offset
