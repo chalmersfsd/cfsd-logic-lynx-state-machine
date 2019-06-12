@@ -174,13 +174,13 @@ class StateMachine {
     bool em_resStatus;
     bool em_resInitialized;
     float em_vehicleSpeed;
-    float em_pressureEbsAct;
-    float em_pressureEbsLine;
-    float em_pressureServiceTank;
-    float em_pressureServiceReg;
-    float em_steerPosition;
-    float em_steerPositionRack;
-    uint32_t em_brakeDutyRequest;
+    float em_prEbsAct;
+    float em_prEbsLine;
+    float em_prServiceTank;
+    float em_prServiceReg;
+    float em_steerPosAct;
+    float em_steerPosRack;
+    uint32_t em_brakeReq;
     int16_t em_torqueReqLeft;
     int16_t em_torqueReqRight;
 

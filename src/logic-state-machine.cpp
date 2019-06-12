@@ -82,12 +82,12 @@ StateMachine::StateMachine(cluon::OD4Session &od4, bool verbose)
   , em_resStatus{false}
   , em_resInitialized{false}
   , em_vehicleSpeed{0.0f}
-  , em_pressureEbsAct{0.0f}
-  , em_pressureEbsLine{0.0f}
-  , em_pressureServiceTank{0.0f}
-  , em_pressureServiceReg{0.0f}
-  , em_steerPosition{0.0f}
-  , em_steerPositionRack{0.0f}
+  , em_prEbsAct{0.0f}
+  , em_prEbsLine{0.0f}
+  , em_prServiceTank{0.0f}
+  , em_prServiceReg{0.0f}
+  , em_steerPosAct{0.0f}
+  , em_steerPosRack{0.0f}
   , em_brakeDutyRequest{0U}
   , em_torqueReqLeft{0}
   , em_torqueReqRight{0}
@@ -122,8 +122,8 @@ void StateMachine::step()
   // -------------------------- INITIAL COPY OF DATA --------------------------
   uint64_t lastUpdateAnalog, lastUpdateGpio;
   bool asms, ebsOk, resGoSignal, resStopSignal, clampExtended, finishSignal, tsOn;
-  float steerPosition, steerPositionRack, vehicleSpeed;
-  float pressureEbsAct, pressureEbsLine, pressureServiceTank, pressureServiceReg;
+  float steerPosAct, steerPosRack, vehicleSpeed;
+  float prEbsAct, prEbsLine, prServiceTank, prServiceReg;
   uint32_t brakeDutyRequest;
   int16_t torqueReqRight, torqueReqLeft;
   asMission mission;
@@ -139,13 +139,13 @@ void StateMachine::step()
     clampExtended = em_clampExtended;
     finishSignal = em_finishSignal;
     tsOn = em_tsOn;
-    steerPosition = em_steerPosition;
-    steerPositionRack = em_steerPositionRack;
+    steerPosAct = em_steerPosAct;
+    steerPosRack = em_steerPosRack;
     vehicleSpeed = em_vehicleSpeed;
-    pressureEbsAct = em_pressureEbsAct;
-    pressureEbsLine = em_pressureEbsLine;
-    pressureServiceTank = em_pressureServiceTank;
-    pressureServiceReg = em_pressureServiceReg;
+    prEbsAct = em_prEbsAct;
+    prEbsLine = em_prEbsLine;
+    prServiceTank = em_prServiceTank;
+    prServiceReg = em_prServiceReg;
     brakeDutyRequest = em_brakeDutyRequest;
     torqueReqRight = em_torqueReqRight;
     torqueReqLeft = em_torqueReqLeft;
@@ -177,9 +177,9 @@ void StateMachine::step()
     em_tsOn = false;
   }
 
-  brakeUpdate(asms, ebsOk, resStopSignal, pressureEbsAct,
-              pressureEbsLine, pressureServiceTank,
-              pressureServiceReg, brakeDutyRequest);
+  brakeUpdate(asms, ebsOk, resStopSignal, prEbsAct,
+              prEbsLine, prServiceTank,
+              prServiceReg, brakeDutyRequest);
   stateUpdate(asms, finishSignal, resGoSignal, tsOn, clampExtended,
               resStopSignal, mission, torqueReqLeft, torqueReqRight,
               vehicleSpeed);
@@ -188,7 +188,7 @@ void StateMachine::step()
 
   // Check steering implausibility
   bool systemReadyOrDriving = (m_asState == asState::AS_DRIVING || m_asState == asState::AS_READY);
-  bool steeringDiffLarge = std::fabs(steerPosition - steerPositionRack) > 10.0f;
+  bool steeringDiffLarge = std::fabs(steerPosAct - steerPosRack) > 10.0f;
   if (systemReadyOrDriving && (!clampExtended || steeringDiffLarge) && resGoSignal) {
     m_steerFault = true;
     std::cout << "[ASS-ERROR] Steering Failure:\n m_clampExtended: " << clampExtended << "\nsteeringDiffLarge: " << steeringDiffLarge << std::endl;        
@@ -208,10 +208,10 @@ void StateMachine::step()
             << "\nBrake state: " << m_brakeState 
             << "\nCompressor: " << m_compressor 
             << "\nSteerClamp: " << clampExtended
-            << "\nEBS pressure line: " << pressureEbsLine
-            << "\nEBS pressure act: " << pressureEbsAct
-            << "\nService pressure tank: " << pressureServiceTank
-            << "\nService pressure reg: " << pressureServiceReg 
+            << "\nEBS pressure line: " << prEbsLine
+            << "\nEBS pressure act: " << prEbsAct
+            << "\nService pressure tank: " << prServiceTank
+            << "\nService pressure reg: " << prServiceReg 
             << "\nbrakeDuty: " << m_brakeDuty
             << "\nbrakeDutyRequest: " << brakeDutyRequest
             << "\nFlash ASSI: " << m_flash2Hz
@@ -223,8 +223,8 @@ void StateMachine::step()
 
 // TODO: handle EBS error LED signal
 void StateMachine::brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
-                               float pressureEbsAct, float pressureEbsLine,
-                               float pressureServiceTank, float pressureServiceReg,
+                               float prEbsAct, float prEbsLine,
+                               float prServiceTank, float prServiceReg,
                                uint32_t brakeDutyRequest)
 {
   std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
@@ -246,17 +246,17 @@ void StateMachine::brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
 
     case ebsInitState::EBS_INIT_CHARGING:
       m_brakeDuty = 20000U;
-      if (pressureEbsAct >= 5 && pressureEbsLine >= 5 && pressureServiceTank >= 6)
+      if (prEbsAct >= 5 && prEbsLine >= 5 && prServiceTank >= 6)
       {
         m_compressor = false;
         m_ebsInitState = ebsInitState::EBS_INIT_COMPRESSOR;
         m_lastEbsInitTransition = timeMillis;
       }
-      else if (((m_lastEbsInitTransition + 5000) <= timeMillis) && (pressureEbsAct <= 0.5)) // TODO: check EBS_line too
+      else if (((m_lastEbsInitTransition + 5000) <= timeMillis) && (prEbsAct <= 0.5)) // TODO: check EBS_line too
       {
         std::cout << "[EBS-Init] Failed to increase pressure above 0.5bar in 5s."
-                  << " m_pressureEbsAct: " << pressureEbsAct
-                  << " m_pressureServiceReg: " << pressureServiceReg << std::endl;
+                  << " m_pressureEbsAct: " << prEbsAct
+                  << " m_pressureServiceReg: " << prServiceReg << std::endl;
         m_ebsInitState = ebsInitState::EBS_INIT_FAILED;
         m_lastEbsInitTransition = timeMillis;
       }
@@ -289,22 +289,22 @@ void StateMachine::brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
 
   // ------------------------------ BRAKE UPDATE ------------------------------
 
-  m_serviceBrakePressureOk = pressureServiceTank >= 6.0f;
-  m_ebsPressureOk = pressureEbsLine >= 6.0f;
-  m_brakesReleased = (pressureEbsAct < 0.1f && pressureServiceReg < 0.1f);
+  m_serviceBrakePressureOk = prServiceTank >= 6.0f;
+  m_ebsPressureOk = prEbsLine >= 6.0f;
+  m_brakesReleased = (prEbsAct < 0.1f && prServiceReg < 0.1f);
   bool systemReadyOrDriving = (m_asState == asState::AS_DRIVING || m_asState == asState::AS_READY);
   bool systemNotOff = (m_asState != asState::AS_OFF && m_asState != asState::AS_FINISHED);
-  bool serviceBrakeLow = (pressureServiceTank <= 4.0f) && systemReadyOrDriving;
+  bool serviceBrakeLow = (prServiceTank <= 4.0f) && systemReadyOrDriving;
      
-  bool sensorDisconnected = (pressureEbsAct < -0.08f || pressureEbsLine < -0.06f || pressureServiceTank < -0.07f);
+  bool sensorDisconnected = (prEbsAct < -0.08f || prEbsLine < -0.06f || prServiceTank < -0.07f);
   bool ebsPressureFail = (!m_ebsPressureOk && systemNotOff);
 
   // Check if the compressor should be on/off
   // TODO: Tune pressure parameters
-  if ((pressureEbsLine > 6.0f && pressureServiceTank > 8.0f) || pressureServiceTank > 9.0f ||
-        pressureServiceTank < -0.05f || m_asState == asState::AS_EMERGENCY) {
+  if ((prEbsLine > 6.0f && prServiceTank > 8.0f) || prServiceTank > 9.0f ||
+        prServiceTank < -0.05f || m_asState == asState::AS_EMERGENCY) {
     m_compressor = false;
-  } else if (asms && (pressureEbsLine < 5.0f || pressureServiceTank < 6.0f)) {
+  } else if (asms && (prEbsLine < 5.0f || prServiceTank < 6.0f)) {
     m_compressor = true;
   }
 
@@ -315,7 +315,7 @@ void StateMachine::brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
 
   if (m_brakeState == BRAKE_AVAILABLE) {
     m_brakeDuty = ((m_lastStateTransition+500U) >= timeMillis) ? 20000U : brakeDutyRequest;
-  } else if (m_brakeState == BRAKE_ENGAGED && pressureEbsAct > 0.1f) {
+  } else if (m_brakeState == BRAKE_ENGAGED && prEbsAct > 0.1f) {
     m_brakeDuty = 20000U;
   } else {
     m_brakeDuty = 0U;
@@ -719,37 +719,37 @@ void StateMachine::setVehicleSpeed(float vehicleSpeed)
 void StateMachine::setPressureEbsAct(float pressure)
 {
   std::lock_guard<std::mutex> lock(m_resourceMutex);
-  em_pressureEbsAct = pressure;
+  em_prEbsAct = pressure;
 }
 
 void StateMachine::setPressureEbsLine(float pressure)
 {
   std::lock_guard<std::mutex> lock(m_resourceMutex);
-  em_pressureEbsLine = pressure;
+  em_prEbsLine = pressure;
 }
 
 void StateMachine::setPressureServiceTank(float pressure)
 {
   std::lock_guard<std::mutex> lock(m_resourceMutex);
-  em_pressureServiceTank = pressure;
+  em_prServiceTank = pressure;
 }
 
 void StateMachine::setPressureServiceReg(float pressure)
 {
   std::lock_guard<std::mutex> lock(m_resourceMutex);
-  em_pressureServiceReg = pressure;
+  em_prServiceReg = pressure;
 }
 
 void StateMachine::setSteerPosition(float pos)
 {
   std::lock_guard<std::mutex> lock(m_resourceMutex);
-  em_steerPosition = pos;
+  em_steerPosAct = pos;
 }
 
 void StateMachine::setSteerPositionRack(float pos)
 {
   std::lock_guard<std::mutex> lock(m_resourceMutex);
-  em_steerPositionRack = pos;
+  em_steerPosRack = pos;
 }
 
 void StateMachine::setBrakeDutyCycle(uint32_t duty)
