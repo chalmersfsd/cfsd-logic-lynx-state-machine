@@ -4,4 +4,4 @@ services:
     state-machine:
         image: chalmersfsd/cfsd-logic-lynx-state-machine:test-delay
         network_mode: "host"
-        command: "state-machine --cid=130 --freq=30 --verbose"
+        command: "state-machine --cid=130 --freq=30"
