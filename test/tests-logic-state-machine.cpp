@@ -28,11 +28,8 @@
 
 TEST_CASE("Test AS state at startup") {
     cluon::OD4Session od4{111};
-    cluon::OD4Session od4Analog{111};
-    cluon::OD4Session od4Gpio{111};
-    cluon::OD4Session od4Pwm{111};
 
-    StateMachine stateMachine(od4, od4Analog, od4Gpio, od4Pwm, 0);
+    StateMachine stateMachine(od4, 0);
     stateMachine.step();
     asState state = stateMachine.getAsState();
 
@@ -41,11 +38,8 @@ TEST_CASE("Test AS state at startup") {
 
 TEST_CASE("Test AS transitions") {
     cluon::OD4Session od4{111};
-    cluon::OD4Session od4Analog{111};
-    cluon::OD4Session od4Gpio{111};
-    cluon::OD4Session od4Pwm{111};
 
-    StateMachine stateMachine(od4, od4Analog, od4Gpio, od4Pwm, 0);
+    StateMachine stateMachine(od4, 0);
 
     SECTION("AS_OFF to AS_READY") {
         stateMachine.setResStatus(true);

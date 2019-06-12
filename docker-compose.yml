@@ -2,6 +2,6 @@ version: '2'
 
 services:
     state-machine:
-        image: testcontainer:latest
+        image: chalmersfsd/cfsd-logic-lynx-state-machine:test-delay
         network_mode: "host"
-        command: "state-machine --cid=219 --cidAnalog=219 --cidGpio=219 --cidPwm=219 --freq=2"
+        command: "state-machine --cid=130 --freq=30 --verbose"

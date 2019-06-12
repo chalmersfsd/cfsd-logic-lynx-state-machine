@@ -21,18 +21,17 @@
 #include "logic-state-machine.hpp"
 #include <iostream>
 
-int32_t main(int32_t argc, char **argv) {
+int32_t main(int32_t argc, char **argv)
+{
     int32_t retCode{0};
     auto commandlineArguments = cluon::getCommandlineArguments(argc, argv);
     if (0 == commandlineArguments.count("cid")
-        || 0 == commandlineArguments.count("cidGpio")
-        || 0 == commandlineArguments.count("cidAnalog")
-        || 0 == commandlineArguments.count("cidPwm")
         || 0 == commandlineArguments.count("freq")) {
         std::cerr << argv[0] << "Module running state-machine for Lynx" << std::endl;
-        std::cerr << "Usage:   " << argv[0] << " --cid=<OpenDaVINCI session> --cidgpio=<OpenDaVINCI session> "
-                  << "--cidanalog=<OpenDaVINCI session> -- cidpwm=<OpenDaVINCI session> --freq=<State-machine frequency> [--verbose]" << std::endl;
-        std::cerr << "Example: " << argv[0] << " --cid=111 --cidgpio=220 --cidanalog=221 --cidpwm=222 --freq=30 --verbose" << std::endl;
+        std::cerr << "Usage:   " << argv[0] << " --cid=<OpenDaVINCI session> "
+                  << "--freq=<State-machine frequency> [--verbose=<Print state machine data] " 
+                  << "[--verbosedata=<Print data trigger data>]" << std::endl;
+        std::cerr << "Example: " << argv[0] << " --cid=111 --freq=30 --verbose" << std::endl;
         retCode = 1;
     } else {
         const bool VERBOSE{commandlineArguments.count("verbose") != 0};
@@ -41,11 +40,8 @@ int32_t main(int32_t argc, char **argv) {
 
         // Interface to a running OpenDaVINCI session.  
         cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
-        cluon::OD4Session od4Analog{static_cast<uint16_t>(std::stoi(commandlineArguments["cidAnalog"]))};
-        cluon::OD4Session od4Gpio{static_cast<uint16_t>(std::stoi(commandlineArguments["cidGpio"]))};
-        cluon::OD4Session od4Pwm{static_cast<uint16_t>(std::stoi(commandlineArguments["cidPwm"]))};
 
-        StateMachine stateMachine(od4, od4Analog, od4Gpio, od4Pwm, VERBOSE);
+        StateMachine stateMachine(od4, VERBOSE);
 
         auto onPressureReading{[&stateMachine, &VERBOSE, VERBOSE_DATA](cluon::data::Envelope &&envelope)
         {
@@ -81,27 +77,7 @@ int32_t main(int32_t argc, char **argv) {
                 }
             }
         }};
-        od4Analog.dataTrigger(opendlv::proxy::PressureReading::ID(), onPressureReading);
-
-        auto onSwitchStateReadingGpio{[&stateMachine](cluon::data::Envelope &&envelope)
-        {
-            uint16_t senderStamp = envelope.senderStamp()-stateMachine.m_senderStampOffsetGpio;
-            
-            if (senderStamp == stateMachine.m_gpioStampEbsOk) {
-                auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
-                stateMachine.setEbsOk(gpioState.state());
-                stateMachine.setLastUpdateGpio(cluon::time::now());
-            } else if (senderStamp == stateMachine.m_gpioStampAsms) {
-                auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
-                stateMachine.setAsms(gpioState.state());
-                stateMachine.setLastUpdateGpio(cluon::time::now());
-            } else if (senderStamp == stateMachine.m_gpioStampClampSensor) {
-                auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
-                stateMachine.setClampExtended(gpioState.state());
-                stateMachine.setLastUpdateGpio(cluon::time::now());
-            }
-        }};
-        od4Gpio.dataTrigger(opendlv::proxy::SwitchStateReading::ID(), onSwitchStateReadingGpio);
+        od4.dataTrigger(opendlv::proxy::PressureReading::ID(), onPressureReading);
 
         auto onGroundSteeringReading{[&stateMachine, &VERBOSE, &VERBOSE_DATA](cluon::data::Envelope &&envelope)
         {
@@ -109,36 +85,65 @@ int32_t main(int32_t argc, char **argv) {
             if (senderStamp == stateMachine.m_analogStampSteerPosition){
                 auto analogInput = cluon::extractMessage<opendlv::proxy::GroundSteeringReading>(std::move(envelope));
                 stateMachine.setSteerPosition(analogInput.groundSteering());
+                stateMachine.setLastUpdateAnalog(cluon::time::now());
                 if (VERBOSE_DATA)
                     std::cout << "[LOGIC-STEERING-POSITION-ACT] Position reading:" << analogInput.groundSteering() << std::endl;
             }else if (senderStamp == stateMachine.m_analogStampSteerPositionRack){
                 auto analogInput = cluon::extractMessage<opendlv::proxy::GroundSteeringReading>(std::move(envelope));
                 stateMachine.setSteerPositionRack(analogInput.groundSteering());
+                stateMachine.setLastUpdateAnalog(cluon::time::now());
                     if (VERBOSE_DATA)
                         std::cout << "[LOGIC-STEERING-POSITION-RACK] Position reading:" << analogInput.groundSteering() << std::endl;
             }
         }};
-        od4Analog.dataTrigger(opendlv::proxy::GroundSteeringReading::ID(), onGroundSteeringReading);
+        od4.dataTrigger(opendlv::proxy::GroundSteeringReading::ID(), onGroundSteeringReading);
 
         auto onSwitchStateReading{[&stateMachine, &VERBOSE_DATA](cluon::data::Envelope &&envelope)
         {
             uint16_t senderStamp = envelope.senderStamp();
-            if (senderStamp == 1403){
+            
+            // ------------------------ GPIO FRONT NODE -----------------------
+            if (senderStamp == stateMachine.m_senderStampOffsetGpio + stateMachine.m_gpioStampEbsOk) {
+                auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
+                stateMachine.setEbsOk(gpioState.state());
+                stateMachine.setLastUpdateGpio(cluon::time::now());
+                if(VERBOSE_DATA) {
+                    std::cout << "[LOGIC-ASS-EBS-OK] GPIO reading: " << gpioState.state() << std::endl;
+                }
+            } else if (senderStamp == stateMachine.m_senderStampOffsetGpio + stateMachine.m_gpioStampAsms) {
+                auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
+                stateMachine.setAsms(gpioState.state());
+                stateMachine.setLastUpdateGpio(cluon::time::now());
+                if(VERBOSE_DATA) {
+                    std::cout << "[LOGIC-ASS-ASMS] GPIO reading: " << gpioState.state() << std::endl;
+                }
+            } else if (senderStamp == stateMachine.m_senderStampOffsetGpio + stateMachine.m_gpioStampClampSensor) {
+                auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
+                stateMachine.setClampExtended(gpioState.state());
+                stateMachine.setLastUpdateGpio(cluon::time::now());
+                if(VERBOSE_DATA) {
+                    std::cout << "[LOGIC-ASS-CLAMP] GPIO reading: " << gpioState.state() << std::endl;
+                }
+
+            // -------------------------- RES PROXY ---------------------------
+            } else if (senderStamp == 1403){
                 auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
                 stateMachine.setFinishSignal(gpioState.state());
-            }else if (senderStamp == stateMachine.m_senderStampResStatus){
+            } else if (senderStamp == stateMachine.m_senderStampResStatus){
                 auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
                 if (VERBOSE_DATA) {
                     std::cout << "[LOGIC-ASS-RES-STATUS] State reading: " << gpioState.state() << std::endl;
                 }
                 stateMachine.setResStatus(gpioState.state());
-            }else if (senderStamp == stateMachine.m_senderStampResStop){
+            } else if (senderStamp == stateMachine.m_senderStampResStop){
                 auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
                 stateMachine.setStopSignal(gpioState.state());
-            }else if (senderStamp == stateMachine.m_senderStampResButtons){
+            } else if (senderStamp == stateMachine.m_senderStampResButtons){
                 auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
-                stateMachine.setGoSignal(((uint8_t) gpioState.state() & 0x04)); //TODO: check if 5 or 7
-            }else if (senderStamp == stateMachine.m_senderStampAsMission){
+                // RES go signal can be true at 5 or 7 so check bitwise with 4
+                // 5 (0101), 7 (0111), 4 (0100)
+                stateMachine.setGoSignal(((uint8_t) gpioState.state() & 0x04));
+            } else if (senderStamp == stateMachine.m_senderStampAsMission){
                 auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
                 stateMachine.setMission(gpioState.state());
             }
@@ -159,14 +164,14 @@ int32_t main(int32_t argc, char **argv) {
             uint16_t senderStamp = envelope.senderStamp();
             if (senderStamp == stateMachine.m_senderStampTorqueIn){
                 auto const torqueReq = cluon::extractMessage<opendlv::cfsdProxy::TorqueRequestDual>(std::move(envelope));
-                int16_t torqueRight = (int16_t)round(torqueReq.torqueRight());
-                int16_t torqueLeft = (int16_t)round(torqueReq.torqueLeft());
+                int16_t torqueRight = static_cast<int16_t>( torqueReq.torqueRight() );
+                int16_t torqueLeft = static_cast<int16_t>( torqueReq.torqueLeft() );
                 stateMachine.setTorqueRequest(torqueRight, torqueLeft);
             }
         }};
         od4.dataTrigger(opendlv::cfsdProxy::TorqueRequestDual::ID(), onTorqueRequest);
 
-        auto atFrequency{[&od4, &stateMachine, &VERBOSE]() -> bool
+        auto atFrequency{[&stateMachine, &VERBOSE]() -> bool
         {
             stateMachine.step();
             

@@ -75,7 +75,7 @@ class StateMachine {
     StateMachine &operator=(StateMachine &&) = delete;
 
   public:
-    StateMachine(cluon::OD4Session &od4, cluon::OD4Session &od4Analog, cluon::OD4Session &od4Gpio, cluon::OD4Session &od4Pwm, bool verbose);
+    StateMachine(cluon::OD4Session &od4, bool verbose);
     ~StateMachine();
 
   private:
@@ -119,9 +119,6 @@ class StateMachine {
 
   private:
     cluon::OD4Session &m_od4;
-    cluon::OD4Session &m_od4Analog;
-    cluon::OD4Session &m_od4Gpio;
-    cluon::OD4Session &m_od4Pwm;
     asState m_prevState;
     asState m_asState;
     ebsState m_ebsState;

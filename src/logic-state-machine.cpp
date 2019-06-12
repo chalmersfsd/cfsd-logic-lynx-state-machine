@@ -26,11 +26,8 @@ float StateMachine::decode(const std::string &data) noexcept {
 }
 */
 
-StateMachine::StateMachine(cluon::OD4Session &od4, cluon::OD4Session &od4Analog, cluon::OD4Session &od4Gpio, cluon::OD4Session &od4Pwm, bool verbose)
+StateMachine::StateMachine(cluon::OD4Session &od4, bool verbose)
   : m_od4{od4}
-  , m_od4Analog{od4Analog}
-  , m_od4Gpio{od4Gpio}
-  , m_od4Pwm{od4Pwm}
   , m_prevState{asState::AS_OFF}
   , m_asState{asState::AS_OFF}
   , m_ebsState{ebsState::EBS_UNAVAILABLE}
@@ -82,7 +79,7 @@ StateMachine::StateMachine(cluon::OD4Session &od4, cluon::OD4Session &od4Analog,
   , em_finishSignal{false}
   , em_ebsOk{false}
   , em_clampExtended{false}
-  , em_resStatus{false} // TODO: add a guard using this
+  , em_resStatus{false}
   , em_resInitialized{false}
   , em_vehicleSpeed{0.0f}
   , em_pressureEbsAct{0.0f}
@@ -199,26 +196,28 @@ void StateMachine::step()
     m_steerFault = false;  
   }
 
-  if (m_verbose) {
-    std::cout << "[AS-state] Current AS state: " << m_asState 
-              << "\nebsOk: " << ebsOk
-              << "\nASMS: " << asms
-              << "\nMission: " << mission
-              << "\nEBS state: " << m_ebsState
-              << "\nBrake state: " << m_brakeState 
-              << "\nCompressor: " << m_compressor 
-              << "\nSteerClamp: " << clampExtended
-              << "\nEBS pressure line: " << pressureEbsLine
-              << "\nEBS pressure act: " << pressureEbsAct
-              << "\nService pressure tank: " << pressureServiceTank
-              << "\nService pressure reg: " << pressureServiceReg 
-              << "\nbrakeDuty: " << m_brakeDuty
-              << "\nbrakeDutyRequest: " << brakeDutyRequest
-              << "\n" << std::endl;
-  }
-
+  if (m_verbose && m_refreshMsg) {
   uint64_t threadTimeEnd = cluon::time::toMicroseconds(cluon::time::now());
-  std::cout << "State machine update took: " << threadTimeEnd - threadTime << "microseconds" << std::endl;
+  std::cout << "[AS-state] Current AS state: " << m_asState 
+            << "\nThread time: " << threadTimeEnd << " microseconds"
+            << "\nState machine update took: " << (float)(threadTimeEnd - threadTime) / 1000.0f << " ms"
+            << "\nebsOk: " << ebsOk
+            << "\nASMS: " << asms
+            << "\nMission: " << mission
+            << "\nEBS state: " << m_ebsState
+            << "\nBrake state: " << m_brakeState 
+            << "\nCompressor: " << m_compressor 
+            << "\nSteerClamp: " << clampExtended
+            << "\nEBS pressure line: " << pressureEbsLine
+            << "\nEBS pressure act: " << pressureEbsAct
+            << "\nService pressure tank: " << pressureServiceTank
+            << "\nService pressure reg: " << pressureServiceReg 
+            << "\nbrakeDuty: " << m_brakeDuty
+            << "\nbrakeDutyRequest: " << brakeDutyRequest
+            << "\nFlash ASSI: " << m_flash2Hz
+            << "\n" << std::endl;
+  }
+  m_refreshMsg = false;
 
 }
 
@@ -282,7 +281,7 @@ void StateMachine::brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
       break;
     }
 
-    if (m_verbose)
+    if (m_verbose && m_refreshMsg)
     {
       std::cout << "[EBS-Init] Current EBS Init state: " << m_ebsInitState << std::endl;
     }
@@ -302,14 +301,15 @@ void StateMachine::brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
 
   // Check if the compressor should be on/off
   // TODO: Tune pressure parameters
-  if ((pressureEbsLine > 6.0f && pressureServiceTank > 8.0f) || pressureServiceTank > 9.0f || pressureServiceTank < -0.05f || m_asState == asState::AS_EMERGENCY){
+  if ((pressureEbsLine > 6.0f && pressureServiceTank > 8.0f) || pressureServiceTank > 9.0f ||
+        pressureServiceTank < -0.05f || m_asState == asState::AS_EMERGENCY) {
     m_compressor = false;
   } else if (asms && (pressureEbsLine < 5.0f || pressureServiceTank < 6.0f)) {
     m_compressor = true;
   }
 
   if (m_asState == AS_OFF && m_ebsInitState == EBS_INIT_INITIALIZED && 
-                                  m_ebsPressureOk && m_serviceBrakePressureOk && ebsOk && !m_compressor) {
+        m_ebsPressureOk && m_serviceBrakePressureOk && ebsOk && !m_compressor) {
     m_ebsState = ebsState::EBS_ARMED;
   }
 
@@ -488,49 +488,43 @@ void StateMachine::setAssi()
 
   if (m_nextFlashTime <= timeMillis){
     m_flash2Hz  = !m_flash2Hz;
+    m_refreshMsg = true;
     m_nextFlashTime = timeMillis + 500U; // TODO: Make better solution
   }
-
-  if (m_verbose){
-    std::cout << "[ASSI-Time] Time: " << timeMillis << "ms \t2Hz toogle:" << m_flash2Hz << std::endl;
-  } 
 
 
   switch(m_asState){
     case asState::AS_OFF:
-      m_blueDuty = 0;
-      m_greenDuty = 0;
-      m_redDuty = 0;
+      m_blueDuty  = 0U;
+      m_greenDuty = 0U;
+      m_redDuty   = 0U;
       break;
     case asState::AS_READY:
-      m_blueDuty = 0;
-      m_greenDuty = 1000000000;
-      m_redDuty = 1000000000;
+      m_blueDuty  = 0U;
+      m_greenDuty = 1000000000U;
+      m_redDuty   = 1000000000U;
       break;
     case asState::AS_DRIVING:
-      m_blueDuty = 0;
-      m_greenDuty = 1000000000*m_flash2Hz;
-      m_redDuty = 1000000000*m_flash2Hz;
+      m_blueDuty  = 0U;
+      m_greenDuty = 1000000000U*m_flash2Hz;
+      m_redDuty   = 1000000000U*m_flash2Hz;
       break;
     case asState::AS_FINISHED:
-      m_blueDuty = 1000000000;
-      m_greenDuty = 0;
-      m_redDuty = 0;
+      m_blueDuty  = 1000000000U;
+      m_greenDuty = 0U;
+      m_redDuty   = 0U;
       break;
     case asState::AS_EMERGENCY:
-      m_blueDuty = 1000000000*m_flash2Hz;
-      m_greenDuty = 0;
-      m_redDuty = 0;
+      m_blueDuty  = 1000000000U*m_flash2Hz;
+      m_greenDuty = 0U;
+      m_redDuty   = 0U;
       break;
     case asState::AS_MANUAL:
-      m_blueDuty = 0;
-      m_greenDuty = 0;
-      m_redDuty = 0;
+      m_blueDuty  = 0U;
+      m_greenDuty = 0U;
+      m_redDuty   = 0U;
       break;
     default:
-      m_blueDuty = 0;
-      m_greenDuty = 0;
-      m_redDuty = 0;
       break;
   }
 }
@@ -539,7 +533,7 @@ void StateMachine::sendMessages()
 {
   // Sending std messages
   cluon::data::TimeStamp sampleTime = cluon::time::now();
-  int16_t senderStamp = 0;
+  int16_t senderStamp;
 
   // GPIO Msg
   opendlv::proxy::SwitchStateRequest msgGpio;
@@ -548,13 +542,13 @@ void StateMachine::sendMessages()
   m_heartbeat = !m_heartbeat;
   senderStamp = m_gpioStampHeartbeat + m_senderStampOffsetGpio;
   msgGpio.state(m_heartbeat);
-  m_od4Gpio.send(msgGpio, sampleTime, senderStamp);
+  m_od4.send(msgGpio, sampleTime, senderStamp);
 
   // m_ebsSpeaker Msg
   if (m_ebsSpeaker != m_ebsSpeakerOld || m_refreshMsg) {
     senderStamp = m_gpioStampEbsSpeaker + m_senderStampOffsetGpio;
     msgGpio.state(m_ebsSpeaker);
-    m_od4Gpio.send(msgGpio, sampleTime, senderStamp);
+    m_od4.send(msgGpio, sampleTime, senderStamp);
     m_ebsSpeakerOld = m_ebsSpeaker;
   }
 
@@ -562,7 +556,7 @@ void StateMachine::sendMessages()
   if (m_compressor != m_compressorOld || m_refreshMsg) {
     senderStamp = m_gpioStampCompressor + m_senderStampOffsetGpio;
     msgGpio.state(m_compressor);
-    m_od4Gpio.send(msgGpio, sampleTime, senderStamp);
+    m_od4.send(msgGpio, sampleTime, senderStamp);
     m_compressorOld = m_compressor;
   }
 
@@ -570,24 +564,23 @@ void StateMachine::sendMessages()
   if (m_finished != m_finishedOld || m_refreshMsg) {
     senderStamp = m_gpioStampFinished + m_senderStampOffsetGpio;
     msgGpio.state(m_finished);
-    m_od4Gpio.send(msgGpio, sampleTime, senderStamp);
+    m_od4.send(msgGpio, sampleTime, senderStamp);
     m_finishedOld = m_finished;
   }
 
-/*
   // m_shutdown Msg
   if (m_shutdown != m_shutdownOld || m_refreshMsg) {
     senderStamp = m_gpioStampShutdown + m_senderStampOffsetGpio;
     msgGpio.state(m_shutdown);
-    m_od4Gpio.send(msgGpio, sampleTime, senderStamp);
+    m_od4.send(msgGpio, sampleTime, senderStamp);
     m_shutdownOld = m_shutdown;
   }
-*/
+  
   // m_serviceBrake
   if (m_serviceBrake != m_serviceBrakeOld || m_refreshMsg) {
     senderStamp = m_gpioStampServiceBrake + m_senderStampOffsetGpio;
     msgGpio.state(m_serviceBrake);
-    m_od4Gpio.send(msgGpio, sampleTime, senderStamp);
+    m_od4.send(msgGpio, sampleTime, senderStamp);
     m_serviceBrakeOld = m_serviceBrake;
   }
 
@@ -597,26 +590,26 @@ void StateMachine::sendMessages()
   if (m_redDuty != m_redDutyOld || m_refreshMsg) {
     senderStamp = m_pwmStampAssiRed + m_senderStampOffsetPwm;
     msgPwm.dutyCycleNs(m_redDuty);
-    m_od4Pwm.send(msgPwm, sampleTime, senderStamp);
+    m_od4.send(msgPwm, sampleTime, senderStamp);
     m_redDutyOld = m_redDuty;
   }
   if (m_greenDuty != m_greenDutyOld || m_refreshMsg) {
     senderStamp = m_pwmStampAssiGreen + m_senderStampOffsetPwm;
     msgPwm.dutyCycleNs(m_greenDuty);
-    m_od4Pwm.send(msgPwm, sampleTime, senderStamp);
+    m_od4.send(msgPwm, sampleTime, senderStamp);
     m_greenDutyOld = m_greenDuty;
   }
   if (m_blueDuty != m_blueDutyOld || m_refreshMsg) {
     senderStamp = m_pwmStampAssiBlue + m_senderStampOffsetPwm;
     msgPwm.dutyCycleNs(m_blueDuty);
-    m_od4Pwm.send(msgPwm, sampleTime, senderStamp);
+    m_od4.send(msgPwm, sampleTime, senderStamp);
     m_blueDutyOld = m_blueDuty;
   }
 
   if (m_brakeDuty != m_brakeDutyOld || m_refreshMsg) {
     senderStamp = m_pwmStampBrake + m_senderStampOffsetPwm;
     msgPwm.dutyCycleNs(m_brakeDuty);
-    m_od4Pwm.send(msgPwm, sampleTime, senderStamp);
+    m_od4.send(msgPwm, sampleTime, senderStamp);
     m_brakeDutyOld = m_brakeDuty;
   }
 
@@ -650,8 +643,7 @@ void StateMachine::sendMessages()
   msgTorqueReqDual.torqueLeft(m_torqueReqLeftCan);
   msgTorqueReqDual.torqueRight(m_torqueReqRightCan);
   m_od4.send(msgTorqueReqDual, sampleTime, senderStamp);
-
-  m_refreshMsg = m_flash2Hz;
+  
 }
 
 
