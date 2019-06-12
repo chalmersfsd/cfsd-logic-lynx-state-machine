@@ -122,23 +122,42 @@ StateMachine::~StateMachine() {}
 
 void StateMachine::step()
 {
-  // ----------------------------- INITIAL CHECKS -----------------------------
-  // Check if we're continuously receiving data from AS node
+  // -------------------------- INITIAL COPY OF DATA --------------------------
   uint64_t lastUpdateAnalog, lastUpdateGpio;
-  bool ebsOk, resGoSignal, clampExtended;
-  float steerPosition, steerPositionRack;
+  bool asms, ebsOk, resGoSignal, resStopSignal, clampExtended, finishSignal, tsOn;
+  float steerPosition, steerPositionRack, vehicleSpeed;
+  float pressureEbsAct, pressureEbsLine, pressureServiceTank, pressureServiceReg;
+  uint32_t brakeDutyRequest;
+  int16_t torqueReqRight, torqueReqLeft;
+  asMission mission;
   {
     std::lock_guard<std::mutex> lock(m_resourceMutex);
 
     lastUpdateAnalog = cluon::time::toMicroseconds(em_lastUpdateAnalog);
     lastUpdateGpio = cluon::time::toMicroseconds(em_lastUpdateGpio);
+    asms = em_asms;
     ebsOk = em_ebsOk;
     resGoSignal = em_resGoSignal;
+    resStopSignal = em_resStopSignal;
     clampExtended = em_clampExtended;
+    finishSignal = em_finishSignal;
+    tsOn = em_tsOn;
     steerPosition = em_steerPosition;
     steerPositionRack = em_steerPositionRack;
+    vehicleSpeed = em_vehicleSpeed;
+    pressureEbsAct = em_pressureEbsAct;
+    pressureEbsLine = em_pressureEbsLine;
+    pressureServiceTank = em_pressureServiceTank;
+    pressureServiceReg = em_pressureServiceReg;
+    brakeDutyRequest = em_brakeDutyRequest;
+    torqueReqRight = em_torqueReqRight;
+    torqueReqLeft = em_torqueReqLeft;
+    mission = em_mission;
   }
 
+  // ----------------------------- INITIAL CHECKS -----------------------------
+
+  // Check if we're continuously receiving data from AS node
   bool frontNodeOk = (lastUpdateAnalog != 0) && (lastUpdateGpio != 0);
   // Check if we're receiving data from AS node
   if(!frontNodeOk){
@@ -161,8 +180,12 @@ void StateMachine::step()
     em_tsOn = false;
   }
 
-  brakeUpdate();
-  stateUpdate();
+  brakeUpdate(asms, ebsOk, resStopSignal, pressureEbsAct,
+              pressureEbsLine, pressureServiceTank,
+              pressureServiceReg, brakeDutyRequest);
+  stateUpdate(asms, finishSignal, resGoSignal, tsOn, clampExtended,
+              resStopSignal, mission, torqueReqLeft, torqueReqRight,
+              vehicleSpeed);
   setAssi();
   sendMessages();
 
@@ -176,31 +199,35 @@ void StateMachine::step()
     m_steerFault = false;  
   }
 
+  if (m_verbose) {
+    std::cout << "[AS-state] Current AS state: " << m_asState 
+              << "\nebsOk: " << ebsOk
+              << "\nASMS: " << asms
+              << "\nMission: " << mission
+              << "\nEBS state: " << m_ebsState
+              << "\nBrake state: " << m_brakeState 
+              << "\nCompressor: " << m_compressor 
+              << "\nSteerClamp: " << clampExtended
+              << "\nEBS pressure line: " << pressureEbsLine
+              << "\nEBS pressure act: " << pressureEbsAct
+              << "\nService pressure tank: " << pressureServiceTank
+              << "\nService pressure reg: " << pressureServiceReg 
+              << "\nbrakeDuty: " << m_brakeDuty
+              << "\nbrakeDutyRequest: " << brakeDutyRequest
+              << "\n" << std::endl;
+  }
+
   uint64_t threadTimeEnd = cluon::time::toMicroseconds(cluon::time::now());
-  if (m_verbose)
-    std::cout << "State machine update took: " << threadTimeEnd - threadTime << "microseconds" << std::endl;
+  std::cout << "State machine update took: " << threadTimeEnd - threadTime << "microseconds" << std::endl;
+
 }
 
 // TODO: handle EBS error LED signal
-void StateMachine::brakeUpdate()
+void StateMachine::brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
+                               float pressureEbsAct, float pressureEbsLine,
+                               float pressureServiceTank, float pressureServiceReg,
+                               uint32_t brakeDutyRequest)
 {
-  // ------------------------------- GRAB DATA --------------------------------
-  bool ebsOk, asms, resStopSignal;
-  float pressureEbsAct, pressureEbsLine, pressureServiceTank, pressureServiceReg;
-  uint32_t brakeDutyRequest;
-  {
-    std::lock_guard<std::mutex> lock(m_resourceMutex);
-
-    asms = em_asms;
-    ebsOk = em_ebsOk;
-    resStopSignal = em_resStopSignal;
-    pressureEbsAct = em_pressureEbsAct;
-    pressureEbsLine = em_pressureEbsLine;
-    pressureServiceTank = em_pressureServiceTank;
-    pressureServiceReg = em_pressureServiceReg;
-    brakeDutyRequest = em_brakeDutyRequest;
-  }
-
   std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
   auto tp_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(tp);
   auto value = tp_ms.time_since_epoch();
@@ -260,6 +287,8 @@ void StateMachine::brakeUpdate()
       std::cout << "[EBS-Init] Current EBS Init state: " << m_ebsInitState << std::endl;
     }
   }
+
+  // ------------------------------ BRAKE UPDATE ------------------------------
 
   m_serviceBrakePressureOk = pressureServiceTank >= 6.0f;
   m_ebsPressureOk = pressureEbsLine >= 6.0f;
@@ -321,7 +350,11 @@ void StateMachine::brakeUpdate()
   }
 }
 
-void StateMachine::stateUpdate()
+void StateMachine::stateUpdate(bool asms, bool finishSignal,
+                               bool resGoSignal, bool tsOn, bool clampExtended,
+                               bool resStopSignal, asMission mission,
+                               int16_t torqueReqLeft, int16_t torqueReqRight,
+                               float vehicleSpeed)
 {
   std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
   auto tp_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(tp);
@@ -335,26 +368,6 @@ void StateMachine::stateUpdate()
   m_torqueReqLeftCan = 0U;
   m_torqueReqRightCan = 0U;
   m_rtd = false;
-
-  bool asms, ebsOk, finishSignal, resGoSignal, tsOn, clampExtended, resStopSignal;
-  asMission mission;
-  int16_t torqueReqLeft, torqueReqRight;
-  float vehicleSpeed;
-  {
-    std::lock_guard<std::mutex> lock(m_resourceMutex);
-
-    asms = em_asms;
-    ebsOk = em_ebsOk;
-    finishSignal = em_finishSignal;
-    resGoSignal = em_resGoSignal;
-    tsOn = em_tsOn;
-    clampExtended = em_clampExtended;
-    mission = em_mission;
-    torqueReqLeft = em_torqueReqLeft;
-    torqueReqRight = em_torqueReqRight;
-    vehicleSpeed = em_vehicleSpeed;
-    resStopSignal = em_resStopSignal;
-  }
 
   switch(m_asState) {
     case asState::AS_OFF:
@@ -461,36 +474,6 @@ void StateMachine::stateUpdate()
     default:
       break;
   }
-
-  if (m_verbose) {
-    float pressureEbsLine, pressureEbsAct, pressureServiceTank, pressureServiceReg;
-    uint32_t brakeDutyRequest;
-    {
-      std::lock_guard<std::mutex> lock(m_resourceMutex);
-
-      pressureEbsLine = em_pressureEbsLine;
-      pressureEbsAct = em_pressureEbsAct;
-      pressureServiceTank = em_pressureServiceTank;
-      pressureServiceReg = em_pressureServiceReg;
-      brakeDutyRequest = em_brakeDutyRequest;
-    }
-    std::cout << "[AS-state] Current AS state: " << m_asState 
-              << "\nebsOk: " << ebsOk
-              << "\nASMS: " << asms
-              << "\nMission: " << mission
-              << "\nEBS state: " << m_ebsState
-              << "\nBrake state: " << m_brakeState 
-              << "\nCompressor: " << m_compressor 
-              << "\nSteerClamp: " << clampExtended
-              << "\nEBS pressure line: " << pressureEbsLine
-              << "\nEBS pressure act: " << pressureEbsAct
-              << "\nService pressure tank: " << pressureServiceTank
-              << "\nService pressure reg: " << pressureServiceReg 
-              << "\nbrakeDuty: " << m_brakeDuty
-              << "\nbrakeDutyRequest: " << brakeDutyRequest
-              << "\n" << std::endl;
-  }
-
 }
 
 // TODO: Also check hydraulic brake pressure during this startup procedure

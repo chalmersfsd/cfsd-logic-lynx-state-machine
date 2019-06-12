@@ -81,8 +81,15 @@ class StateMachine {
   private:
     void setUp();
     void tearDown();
-    void brakeUpdate();
-    void stateUpdate();
+    void brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
+                     float pressureEbsAct, float pressureEbsLine,
+                     float pressureServiceTank, float pressureServiceReg,
+                     uint32_t brakeDutyRequest);
+    void stateUpdate(bool asms, bool finishSignal,
+                     bool resGoSignal, bool tsOn, bool clampExtended,
+                     bool resStopSignal, asMission mission,
+                     int16_t torqueReqLeft, int16_t torqueReqRight,
+                     float vehicleSpeed);
     void setAssi();
     void sendMessages();
 
