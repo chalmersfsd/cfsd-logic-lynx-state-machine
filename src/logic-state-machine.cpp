@@ -186,7 +186,7 @@ void StateMachine::step()
               resStopSignal, mission, torqueReqLeft, torqueReqRight,
               vehicleSpeed);
   setAssi();
-  // sendMessages();
+  sendMessages();
 
   // Check steering implausibility
   bool systemReadyOrDriving = (m_asState == asState::AS_DRIVING || m_asState == asState::AS_READY);
