@@ -88,7 +88,7 @@ StateMachine::StateMachine(cluon::OD4Session &od4, bool verbose)
   , em_prServiceReg{0.0f}
   , em_steerPosAct{0.0f}
   , em_steerPosRack{0.0f}
-  , em_brakeDutyRequest{0U}
+  , em_brakeReq{0U}
   , em_torqueReqLeft{0}
   , em_torqueReqRight{0}
 
@@ -146,7 +146,7 @@ void StateMachine::step()
     prEbsLine = em_prEbsLine;
     prServiceTank = em_prServiceTank;
     prServiceReg = em_prServiceReg;
-    brakeDutyRequest = em_brakeDutyRequest;
+    brakeDutyRequest = em_brakeReq;
     torqueReqRight = em_torqueReqRight;
     torqueReqLeft = em_torqueReqLeft;
     mission = em_mission;
@@ -170,6 +170,8 @@ void StateMachine::step()
       m_modulesRunning = false;
       std::cout << "[ASS-ERROR] Module has crashed. Last gpio update:" << gpioDelay << "\t Last analog update: " << analogDelay << std::endl;
   }
+  std::cout << "Analog delay: " << static_cast<float>(analogDelay) / 1000.0f << " ms\n"
+               "GPIO delay: " << static_cast<float>(gpioDelay) / 1000.0f << " ms" << std::endl;
 
   if (ebsOk) { // TODO: Remove this when tsOn signal has been added to AS node
     em_tsOn = true;
@@ -535,14 +537,9 @@ void StateMachine::sendMessages()
   cluon::data::TimeStamp sampleTime = cluon::time::now();
   int16_t senderStamp;
 
+  
   // GPIO Msg
   opendlv::proxy::SwitchStateRequest msgGpio;
-
-  //Heartbeat Msg
-  m_heartbeat = !m_heartbeat;
-  senderStamp = m_gpioStampHeartbeat + m_senderStampOffsetGpio;
-  msgGpio.state(m_heartbeat);
-  m_od4.send(msgGpio, sampleTime, senderStamp);
 
   // m_ebsSpeaker Msg
   if (m_ebsSpeaker != m_ebsSpeakerOld || m_refreshMsg) {
@@ -646,7 +643,25 @@ void StateMachine::sendMessages()
   
 }
 
+void StateMachine::heartbeat()
+{
+  // Heartbeat is updated in separate thread at different frequency
+  // from main loop
+  while(m_od4.isRunning()) {
+    // GPIO Msg
+    opendlv::proxy::SwitchStateRequest msgGpio;
 
+    //Heartbeat Msg
+    m_heartbeat = !m_heartbeat;
+    uint16_t senderStamp = m_gpioStampHeartbeat + m_senderStampOffsetGpio;
+    msgGpio.state(m_heartbeat);
+    m_od4.send(msgGpio, cluon::time::now(), senderStamp);
+    std::cout << "In heartbeat thread" << std::endl;
+
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(100ms);
+  }
+}
 
 asState StateMachine::getAsState() {return m_asState;}
 
@@ -755,7 +770,7 @@ void StateMachine::setSteerPositionRack(float pos)
 void StateMachine::setBrakeDutyCycle(uint32_t duty)
 {
   std::lock_guard<std::mutex> lock(m_resourceMutex);
-  em_brakeDutyRequest = duty;
+  em_brakeReq = duty;
 }
 
 void StateMachine::setTorqueRequest(int16_t torqueRight, int16_t torqueLeft)

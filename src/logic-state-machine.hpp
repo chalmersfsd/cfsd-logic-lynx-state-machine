@@ -95,6 +95,7 @@ class StateMachine {
 
   public:
     void step();
+    void heartbeat();
     asState getAsState();
     void setLastUpdateAnalog(cluon::data::TimeStamp time);
     void setLastUpdateGpio(cluon::data::TimeStamp time);
