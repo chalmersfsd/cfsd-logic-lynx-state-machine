@@ -181,7 +181,7 @@ class StateMachine {
     float em_prServiceReg;
     float em_steerPosAct;
     float em_steerPosRack;
-    uint32_t em_brakeReq;
+    uint32_t em_brakeDutyReq;
     int16_t em_torqueReqLeft;
     int16_t em_torqueReqRight;
 
