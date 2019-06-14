@@ -92,10 +92,11 @@ class StateMachine {
                      float vehicleSpeed);
     void setAssi();
     void sendMessages();
+    void heartbeat();
+    uint64_t msTimeNow();
 
   public:
     void step();
-    void heartbeat();
     asState getAsState();
     void setLastUpdateAnalog(cluon::data::TimeStamp time);
     void setLastUpdateGpio(cluon::data::TimeStamp time);
