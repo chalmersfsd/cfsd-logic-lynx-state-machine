@@ -188,6 +188,9 @@ class StateMachine {
     // Resource mutex for all data set by data triggers
     std::mutex m_resourceMutex;
 
+    // Run heartbeat in separate thread
+    std::thread _heartbeatThread;
+
   public:
     // Senderstamps offset
     const uint16_t m_senderStampOffsetGpio = 1000;

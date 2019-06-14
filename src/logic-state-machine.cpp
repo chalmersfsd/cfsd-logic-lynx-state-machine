@@ -93,6 +93,8 @@ StateMachine::StateMachine(cluon::OD4Session &od4, bool verbose)
   , em_torqueReqRight{0}
 
   , m_resourceMutex{}
+
+  , _heartbeatThread{}
 {
   std::cout << "Initializing state machine... ";
 
@@ -112,6 +114,10 @@ StateMachine::StateMachine(cluon::OD4Session &od4, bool verbose)
     em_lastUpdateGpio = cluon::time::now();
   }
 
+  // Start heartbeat in its own thread
+  _heartbeatThread = std::thread(&StateMachine::heartbeat, this);
+  _heartbeatThread.detach();
+
   std::cout << "done." << std::endl;
 }
 
@@ -121,7 +127,8 @@ void StateMachine::step()
 {
   // -------------------------- INITIAL COPY OF DATA --------------------------
   uint64_t lastUpdateAnalog, lastUpdateGpio;
-  bool asms, ebsOk, resGoSignal, resStopSignal, clampExtended, finishSignal, tsOn;
+  bool asms, ebsOk,clampExtended, finishSignal, tsOn;
+  bool resGoSignal, resStopSignal, resInitialized;
   float steerPosAct, steerPosRack, vehicleSpeed;
   float prEbsAct, prEbsLine, prServiceTank, prServiceReg;
   uint32_t brakeDutyReq;
@@ -134,11 +141,12 @@ void StateMachine::step()
     lastUpdateGpio = cluon::time::toMicroseconds(em_lastUpdateGpio);
     asms = em_asms;
     ebsOk = em_ebsOk;
-    resGoSignal = em_resGoSignal;
-    resStopSignal = em_resStopSignal;
     clampExtended = em_clampExtended;
     finishSignal = em_finishSignal;
     tsOn = em_tsOn;
+    resGoSignal = em_resGoSignal;
+    resStopSignal = em_resStopSignal;
+    resInitialized = em_resInitialized;
     steerPosAct = em_steerPosAct;
     steerPosRack = em_steerPosRack;
     vehicleSpeed = em_vehicleSpeed;
@@ -157,9 +165,9 @@ void StateMachine::step()
   // Check if we're continuously receiving data from AS node
   bool frontNodeOk = (lastUpdateAnalog != 0) && (lastUpdateGpio != 0);
   // Check if we're receiving data from AS node
-  if(!frontNodeOk){
-    std::cout << "Front node status: " << (frontNodeOk ? "On\n" : "Off\n") << 
-                 "RES status: " << (em_resInitialized ? "On" : "Off") << std::endl;
+  if(!frontNodeOk || !resInitialized){
+    std::cout << "Front node status: " << (frontNodeOk ? "On" : "Off") << 
+               "\nRES status:        " << (em_resInitialized ? "On" : "Off") << std::endl;
     return;
   }
   m_modulesRunning = true;
@@ -544,10 +552,8 @@ void StateMachine::sendMessages()
   cluon::data::TimeStamp sampleTime = cluon::time::now();
   int16_t senderStamp;
 
-  
   // GPIO Msg
   opendlv::proxy::SwitchStateRequest msgGpio;
-
 
   // m_ebsSpeaker Msg
   if (m_ebsSpeaker != m_ebsSpeakerOld || m_refreshMsg) {
@@ -564,7 +570,7 @@ void StateMachine::sendMessages()
     m_od4.send(msgGpio, sampleTime, senderStamp);
     m_compressorOld = m_compressor;
   }
-/*
+
   // m_finished Msg
   if (m_finished != m_finishedOld || m_refreshMsg) {
     senderStamp = m_gpioStampFinished + m_senderStampOffsetGpio;
@@ -572,9 +578,7 @@ void StateMachine::sendMessages()
     m_od4.send(msgGpio, sampleTime, senderStamp);
     m_finishedOld = m_finished;
   }
-*/
 
-  /*
   // m_shutdown Msg
   if (m_shutdown != m_shutdownOld || m_refreshMsg) {
     senderStamp = m_gpioStampShutdown + m_senderStampOffsetGpio;
@@ -582,7 +586,6 @@ void StateMachine::sendMessages()
     m_od4.send(msgGpio, sampleTime, senderStamp);
     m_shutdownOld = m_shutdown;
   }
-  */
   
   // m_serviceBrake
   if (m_serviceBrake != m_serviceBrakeOld || m_refreshMsg) {
@@ -592,10 +595,9 @@ void StateMachine::sendMessages()
     m_serviceBrakeOld = m_serviceBrake;
   }
 
-
   // Send pwm Requests
   opendlv::proxy::PulseWidthModulationRequest msgPwm;
-  /*
+  
   if (m_redDuty != m_redDutyOld || m_refreshMsg) {
     senderStamp = m_pwmStampAssiRed + m_senderStampOffsetPwm;
     msgPwm.dutyCycleNs(m_redDuty);
@@ -614,7 +616,7 @@ void StateMachine::sendMessages()
     m_od4.send(msgPwm, sampleTime, senderStamp);
     m_blueDutyOld = m_blueDuty;
   }
-  */
+  
 
   if (m_brakeDuty != m_brakeDutyOld || m_refreshMsg) {
     senderStamp = m_pwmStampBrake + m_senderStampOffsetPwm;
@@ -623,7 +625,7 @@ void StateMachine::sendMessages()
     m_brakeDutyOld = m_brakeDuty;
   }
 
-/*
+
   //Send Current state of state machine
   opendlv::proxy::SwitchStateReading msgGpioRead;
 
@@ -652,15 +654,13 @@ void StateMachine::sendMessages()
   msgTorqueReqDual.torqueLeft(m_torqueReqLeftCan);
   msgTorqueReqDual.torqueRight(m_torqueReqRightCan);
   m_od4.send(msgTorqueReqDual, sampleTime, senderStamp);
-*/
+
 }
 
 void StateMachine::heartbeat()
 {
   // Heartbeat is updated in separate thread at different frequency
   // from main loop
-  using namespace cluon;
-  static uint64_t lastHeartbeat = time::toMicroseconds(time::now());
   while(m_od4.isRunning()) {
     // GPIO Msg
     opendlv::proxy::SwitchStateRequest msgGpio;
@@ -669,11 +669,7 @@ void StateMachine::heartbeat()
     m_heartbeat = !m_heartbeat;
     uint16_t senderStamp = m_gpioStampHeartbeat + m_senderStampOffsetGpio;
     msgGpio.state(m_heartbeat);
-    m_od4.send(msgGpio, time::now(), senderStamp);
-
-    std::cout << "Heartbeat timer: " << float(time::toMicroseconds(time::now()) - lastHeartbeat) / 1000.0f << " ms" << std::endl;
-
-    lastHeartbeat = time::toMicroseconds(time::now());
+    m_od4.send(msgGpio, cluon::time::now(), senderStamp);
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(100ms);
   }
