@@ -145,7 +145,7 @@ int32_t main(int32_t argc, char **argv)
                 auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
                 // RES go signal can be true at 5 or 7 so check bitwise with 4
                 // 5 (0101), 7 (0111), 4 (0100)
-                stateMachine.setGoSignal(((uint8_t) gpioState.state() & 0x04));
+                stateMachine.setGoSignal( static_cast<int>(gpioState.state()) & 0x04 );
             } else if (senderStamp == stateMachine.m_senderStampAsMission){
                 auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
                 stateMachine.setMission(gpioState.state());
