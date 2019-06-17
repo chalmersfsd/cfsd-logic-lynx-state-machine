@@ -129,9 +129,6 @@ int32_t main(int32_t argc, char **argv)
                 }
 
             // -------------------------- RES PROXY ---------------------------
-            } else if (senderStamp == 1403){
-                auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
-                stateMachine.setFinishSignal(gpioState.state());
             } else if (senderStamp == stateMachine.m_senderStampResStatus){
                 auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(envelope));
                 if (VERBOSE_DATA) {
@@ -152,6 +149,19 @@ int32_t main(int32_t argc, char **argv)
             }
         }};
         od4.dataTrigger(opendlv::proxy::SwitchStateReading::ID(), onSwitchStateReading);
+
+        auto onSwitchStateRequest{[&stateMachine, &VERBOSE_DATA](cluon::data::Envelope &&envelope)
+        {
+            uint16_t senderStamp = envelope.senderStamp();
+
+             if (senderStamp == 1403){
+                auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateRequest>(std::move(envelope));
+                stateMachine.setFinishSignal(gpioState.state());
+
+                if (VERBOSE_DATA) std::cout << "[LOGIC-ASS-FINISHED] State reading: " << gpioState.state() << std::endl;
+             }
+        }};
+        od4.dataTrigger(opendlv::proxy::SwitchStateRequest::ID(), onSwitchStateRequest);
 
         auto onPulseWidthModulationRequest{[&stateMachine, &VERBOSE](cluon::data::Envelope &&envelope)
         {

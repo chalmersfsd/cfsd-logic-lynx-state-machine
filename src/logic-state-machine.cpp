@@ -175,10 +175,10 @@ void StateMachine::step()
 
   brakeUpdate(asms, ebsOk, resStopSignal, prEbsAct,
               prEbsLine, prServiceTank,
-              prServiceReg, brakeDutyReq);
+              prServiceReg);
   stateUpdate(asms, finishSignal, resGoSignal, tsOn, clampExtended,
               resStopSignal, mission, torqueReqLeft, torqueReqRight,
-              vehicleSpeed);
+              brakeDutyReq, vehicleSpeed);
   setAssi();
   sendMessages();
 
@@ -230,8 +230,7 @@ void StateMachine::step()
 // TODO: handle EBS error LED signal
 void StateMachine::brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
                                float prEbsAct, float prEbsLine,
-                               float prServiceTank, float prServiceReg,
-                               uint32_t brakeDutyReq)
+                               float prServiceTank, float prServiceReg)
 {
   uint64_t timeMillis = msTimeNow();
 
@@ -312,7 +311,7 @@ void StateMachine::brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
   // Check if the compressor should be on/off
   // TODO: Tune pressure parameters
   if ((prEbsLine > 7.0f && prServiceTank > 8.0f) || prServiceTank > 9.0f ||
-        prServiceTank < -0.05f || m_asState == asState::AS_EMERGENCY) {
+        prServiceTank < -0.05f || m_asState == asState::AS_EMERGENCY || !m_modulesRunning) {
     m_compressor = false;
   } else if (asms && (prEbsLine < 6.0f || prServiceTank < 6.0f)) {
     m_compressor = true;
@@ -358,7 +357,7 @@ void StateMachine::stateUpdate(bool asms, bool finishSignal,
                                bool resGoSignal, bool tsOn, bool clampExtended,
                                bool resStopSignal, asMission mission,
                                int16_t torqueReqLeft, int16_t torqueReqRight,
-                               float vehicleSpeed)
+                               uint32_t brakeDutyReq, float vehicleSpeed)
 {
   uint64_t timeMillis = msTimeNow();
 
@@ -429,7 +428,7 @@ void StateMachine::stateUpdate(bool asms, bool finishSignal,
       m_torqueReqRightCan = torqueReqRight;
       m_rtd = true;
 
-      m_brakeDuty = ((m_lastStateTransition+500U) >= timeMillis) ? 20000U : brakeDutyReq;
+      m_brakeDuty = brakeDutyReq;
       
       // --------------------- AS_DRIVING -> AS_EMERGENCY ---------------------
       if (m_ebsState == EBS_ACTIVATED) {
@@ -449,6 +448,7 @@ void StateMachine::stateUpdate(bool asms, bool finishSignal,
       m_brakeState = serviceBrakeState::BRAKE_ENGAGED;
       m_ebsState = ebsState::EBS_ACTIVATED;
       m_finished = true;
+      m_shutdown = true;
 
       m_brakeDuty = ((m_lastStateTransition+10000U) >= timeMillis) ? 20000U : 0U;
       

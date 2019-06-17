@@ -83,13 +83,12 @@ class StateMachine {
     void tearDown();
     void brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
                      float pressureEbsAct, float pressureEbsLine,
-                     float pressureServiceTank, float pressureServiceReg,
-                     uint32_t brakeDutyRequest);
+                     float pressureServiceTank, float pressureServiceReg);
     void stateUpdate(bool asms, bool finishSignal,
                      bool resGoSignal, bool tsOn, bool clampExtended,
                      bool resStopSignal, asMission mission,
                      int16_t torqueReqLeft, int16_t torqueReqRight,
-                     float vehicleSpeed);
+                     uint32_t brakeDutyReq, float vehicleSpeed);
     void setAssi();
     void sendMessages();
     void heartbeat();
