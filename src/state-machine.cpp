@@ -154,7 +154,7 @@ int32_t main(int32_t argc, char **argv)
         {
             uint16_t senderStamp = envelope.senderStamp();
 
-             if (senderStamp == 1403){
+             if (senderStamp == 2102){
                 auto gpioState = cluon::extractMessage<opendlv::proxy::SwitchStateRequest>(std::move(envelope));
                 stateMachine.setFinishSignal(gpioState.state());
 
