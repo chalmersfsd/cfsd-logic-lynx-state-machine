@@ -598,6 +598,10 @@ void StateMachine::sendMessages()
     m_serviceBrakeOld = m_serviceBrake;
   }
 
+  senderStamp = m_senderStampRTD;
+  msgGpio.state((uint16_t)m_rtd);
+  m_od4.send(msgGpio, sampleTime, senderStamp);
+
 
   // Send pwm Requests
   opendlv::proxy::PulseWidthModulationRequest msgPwm;
@@ -633,10 +637,6 @@ void StateMachine::sendMessages()
 
   senderStamp = m_senderStampAsState;
   msgGpioRead.state((uint16_t)m_asState);
-  m_od4.send(msgGpioRead, sampleTime, senderStamp);
-
-  senderStamp = m_senderStampRTD;
-  msgGpioRead.state((uint16_t)m_rtd);
   m_od4.send(msgGpioRead, sampleTime, senderStamp);
 
   senderStamp = m_senderStampEBSFault;

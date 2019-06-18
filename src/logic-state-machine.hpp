@@ -201,7 +201,7 @@ class StateMachine {
     const uint16_t m_senderStampResInitialize = 1099;
     const uint16_t m_senderStampTorqueOut = 1910;
     const uint16_t m_senderStampAsState = 2101;
-    const uint16_t m_senderStampRTD = 2104;
+    const uint16_t m_senderStampRTD = 1904;
     const uint16_t m_senderStampEBSFault = 2105;
     const uint16_t m_senderStampBrakeReq = 2150;
     const uint16_t m_senderStampSteeringState = 2113;
