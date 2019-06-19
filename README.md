@@ -67,4 +67,5 @@ AMD64: docker build -f Dockerfile.amd64 -t chalmersfsd/cfsd-logic-lynx-state-mac
 |                                             |     1320     |        ASSI red        |
 |                                             |     1321     |        ASSI green      |
 
-### Transition Chart
+### Transition Diagram
+![State transition chart](https://raw.githubusercontent.com/chalmersfsd/cfsd-logic-lynx-state-machine/test-extended-message-set/figures/state-transition-chart.png)
