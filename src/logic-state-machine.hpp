@@ -206,7 +206,6 @@ class StateMachine {
     const uint16_t m_senderStampBrakeReq = 2150;
     const uint16_t m_senderStampSteeringState = 2113;
     const uint16_t m_senderStampEbsState = 2114;
-    const uint16_t m_senderStampServiceValveState = 2115;
 
     // Torque senderstamps
     const uint16_t m_senderStampTorqueIn = 2101;
