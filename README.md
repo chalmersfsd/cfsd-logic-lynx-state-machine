@@ -15,11 +15,13 @@ AMD64: docker build -f Dockerfile.amd64 -t chalmersfsd/state-machine:v0.0.0 .
   - Steering clamp extended (1112)
   - ASMS on/off             (1115)
   - TS on/off               (???)
-  - Finish signal           (1403)
-  - RTD                     (1404)
-  - RES stop signal         (1406)
-  - RES status              (1408)
-  - Go signal               (1410)
+  - RTD                     (2104)
+  - RES stop signal         (1802)
+  - RES status              (1801)
+  - RES buttons             (1804)
+
+- opendlv::proxy::SwitchStateRequest
+  - Finish signal           (2102)
 
 - opendlv::proxy::GroundSpeedReading
   - Vehicle Speed (???)
