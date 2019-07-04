@@ -44,7 +44,19 @@ int32_t main(int32_t argc, char **argv)
 
         StateMachine stateMachine(od4, VERBOSE);
 
-        // StateMachine stateMachine(od4, VERBOSE);
+        auto onGroundSpeedReading{[&stateMachine, VERBOSE_DATA](cluon::data::Envelope &&envelope) 
+        {
+            uint16_t senderStamp = envelope.senderStamp();
+            if (senderStamp == stateMachine.m_senderStampGroundSpeed) {
+              auto gsr = cluon::extractMessage<opendlv::proxy::GroundSpeedReading>(std::move(envelope));
+              stateMachine.setVehicleSpeed(gsr.groundSpeed());
+
+              if (VERBOSE_DATA) {
+                std::cout << "GroundSpeedReading: " << gsr.groundSpeed() << std::endl;
+              }
+            }
+          }};
+        od4.dataTrigger(opendlv::proxy::GroundSpeedReading::ID(), onGroundSpeedReading);
 
         auto onPressureReading{[&stateMachine, &VERBOSE, VERBOSE_DATA](cluon::data::Envelope &&envelope)
         {

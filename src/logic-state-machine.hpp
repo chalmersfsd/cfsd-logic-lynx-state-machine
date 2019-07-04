@@ -218,6 +218,9 @@ class StateMachine {
     // Input from CAN proxy
     const uint16_t m_senderStampAsMission = 1906;
 
+    // Input from SLAM
+    const uint16_t m_senderStampGroundSpeed = 3000;
+
     // Depends on pin value in opendlv-device-stm32-lynx
     const uint16_t m_gpioStampEbsOk = 49;
     const uint16_t m_gpioStampAsms = 115;
