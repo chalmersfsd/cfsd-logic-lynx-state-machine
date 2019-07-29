@@ -2,6 +2,8 @@ version: '2'
 
 services:
     state-machine:
-        image: chalmersfsd/cfsd-logic-lynx-state-machine:tag
+        image: chalmersfsd/cfsd-logic-lynx-state-machine:<tag>
         network_mode: "host"
+        volumes:
+            - $PWD:/opt/
         command: "state-machine --cid=130 --freq=30"
