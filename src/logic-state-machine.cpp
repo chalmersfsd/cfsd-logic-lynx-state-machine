@@ -150,13 +150,13 @@ void StateMachine::step()
 
   // Check if we have received data from AS node
   bool frontNodeOk = (lastUpdateAnalog != 0) && (lastUpdateGpio != 0);
-  if(!frontNodeOk) { // TODO: || !resInitialized
+  if(!frontNodeOk || !resInitialized) {
     std::cout << "Front node status: "   << (frontNodeOk ? "On" : "Off") 
               << "\nRES status:        " << (resInitialized ? "On" : "Off")
               << std::endl;
-    return;
+  } else {
+    m_modulesRunning = true;
   }
-  m_modulesRunning = true;
 
   uint64_t threadTime = cluon::time::toMicroseconds(cluon::time::now());
   uint64_t analogDelay = threadTime - lastUpdateAnalog;
@@ -550,16 +550,17 @@ void StateMachine::setAssi()
 
 void StateMachine::sendMessages()
 {
-  {
-    // Locking od4 mutex to avoid conflict with heartbeat thread
-    std::lock_guard<std::mutex> lock(m_od4Mutex);
 
-    cluon::data::TimeStamp sampleTime = cluon::time::now();
-    int16_t senderStamp;
+    
+  cluon::data::TimeStamp sampleTime = cluon::time::now();
+  int16_t senderStamp;
+
+  // Locking od4 mutex to avoid conflict with heartbeat thread
+  {
+    std::lock_guard<std::mutex> lock(m_od4Mutex);
 
     // GPIO Msg
     opendlv::proxy::SwitchStateRequest msgGpio;
-
 
     // m_ebsSpeaker Msg
     if (m_ebsSpeaker != m_ebsSpeakerOld || m_refreshMsg) {
@@ -670,6 +671,9 @@ void StateMachine::heartbeat()
   // Heartbeat is updated in separate thread at different frequency
   // from main loop
   while(m_od4.isRunning()) {
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(50ms);
+
     // GPIO Msg
     {
       //Locking od4 mutex to avoid conflict with other message sending
@@ -681,10 +685,7 @@ void StateMachine::heartbeat()
       uint16_t senderStamp = m_gpioStampHeartbeat + m_senderStampOffsetGpio;
       msgGpio.state(m_heartbeat);
       m_od4.send(msgGpio, cluon::time::now(), senderStamp);
-      using namespace std::chrono_literals;
-      std::this_thread::sleep_for(50ms);
     }
-
   }
 }
 
