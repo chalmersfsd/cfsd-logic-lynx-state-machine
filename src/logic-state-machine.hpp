@@ -187,6 +187,7 @@ class StateMachine {
 
     // Resource mutex for all data set by data triggers
     std::mutex m_resourceMutex;
+    std::mutex m_od4Mutex;
 
     // Run heartbeat in separate thread
     std::thread _heartbeatThread;

@@ -86,6 +86,7 @@ StateMachine::StateMachine(cluon::OD4Session &od4, bool verbose)
   , em_torqueReqRight{0}
 
   , m_resourceMutex{}
+  , m_od4Mutex{}
 
   , _heartbeatThread{}
 {
@@ -549,114 +550,117 @@ void StateMachine::setAssi()
 
 void StateMachine::sendMessages()
 {
-  // Sending std messages
-  cluon::data::TimeStamp sampleTime = cluon::time::now();
-  int16_t senderStamp;
+  {
+    // Locking od4 mutex to avoid conflict with heartbeat thread
+    std::lock_guard<std::mutex> lock(m_od4Mutex);
 
-  // GPIO Msg
-  opendlv::proxy::SwitchStateRequest msgGpio;
+    cluon::data::TimeStamp sampleTime = cluon::time::now();
+    int16_t senderStamp;
 
-  
-  // m_ebsSpeaker Msg
-  if (m_ebsSpeaker != m_ebsSpeakerOld || m_refreshMsg) {
-    senderStamp = m_gpioStampEbsSpeaker + m_senderStampOffsetGpio;
-    msgGpio.state(m_ebsSpeaker);
+    // GPIO Msg
+    opendlv::proxy::SwitchStateRequest msgGpio;
+
+
+    // m_ebsSpeaker Msg
+    if (m_ebsSpeaker != m_ebsSpeakerOld || m_refreshMsg) {
+      senderStamp = m_gpioStampEbsSpeaker + m_senderStampOffsetGpio;
+      msgGpio.state(m_ebsSpeaker);
+      m_od4.send(msgGpio, sampleTime, senderStamp);
+      m_ebsSpeakerOld = m_ebsSpeaker;
+    }
+
+
+    // m_compressor Msg
+    if (m_compressor != m_compressorOld || m_refreshMsg) {
+      senderStamp = m_gpioStampCompressor + m_senderStampOffsetGpio;
+      msgGpio.state(m_compressor);
+      m_od4.send(msgGpio, sampleTime, senderStamp);
+      m_compressorOld = m_compressor;
+    }
+
+    // m_finished Msg
+    if (m_finished != m_finishedOld || m_refreshMsg) {
+      senderStamp = m_gpioStampFinished + m_senderStampOffsetGpio;
+      msgGpio.state(m_finished);
+      m_od4.send(msgGpio, sampleTime, senderStamp);
+      m_finishedOld = m_finished;
+    }
+
+    // m_shutdown Msg
+    if (m_shutdown != m_shutdownOld || m_refreshMsg) {
+      senderStamp = m_gpioStampShutdown + m_senderStampOffsetGpio;
+      msgGpio.state(m_shutdown);
+      m_od4.send(msgGpio, sampleTime, senderStamp);
+      m_shutdownOld = m_shutdown;
+    }
+
+    // m_serviceBrake
+    if (m_serviceBrake != m_serviceBrakeOld || m_refreshMsg) {
+      senderStamp = m_gpioStampServiceBrake + m_senderStampOffsetGpio;
+      msgGpio.state(m_serviceBrake);
+      m_od4.send(msgGpio, sampleTime, senderStamp);
+      m_serviceBrakeOld = m_serviceBrake;
+    }
+
+    senderStamp = m_senderStampRTD;
+    msgGpio.state((uint16_t)m_rtd);
     m_od4.send(msgGpio, sampleTime, senderStamp);
-    m_ebsSpeakerOld = m_ebsSpeaker;
+
+
+    // Send pwm Requests
+    opendlv::proxy::PulseWidthModulationRequest msgPwm;
+
+    if (m_redDuty != m_redDutyOld) {
+      senderStamp = m_pwmStampAssiRed + m_senderStampOffsetPwm;
+      msgPwm.dutyCycleNs(m_redDuty);
+      m_od4.send(msgPwm, sampleTime, senderStamp);
+      m_redDutyOld = m_redDuty;
+    }
+    if (m_greenDuty != m_greenDutyOld) {
+      senderStamp = m_pwmStampAssiGreen + m_senderStampOffsetPwm;
+      msgPwm.dutyCycleNs(m_greenDuty);
+      m_od4.send(msgPwm, sampleTime, senderStamp);
+      m_greenDutyOld = m_greenDuty;
+    }
+    if (m_blueDuty != m_blueDutyOld) {
+      senderStamp = m_pwmStampAssiBlue + m_senderStampOffsetPwm;
+      msgPwm.dutyCycleNs(m_blueDuty);
+      m_od4.send(msgPwm, sampleTime, senderStamp);
+      m_blueDutyOld = m_blueDuty;
+    }
+
+    if (m_brakeDuty != m_brakeDutyOld || m_refreshMsg) {
+      senderStamp = m_pwmStampBrake + m_senderStampOffsetPwm;
+      msgPwm.dutyCycleNs(m_brakeDuty);
+      m_od4.send(msgPwm, sampleTime, senderStamp);
+      m_brakeDutyOld = m_brakeDuty;
+    }
+
+    //Send Current state of state machine
+    opendlv::proxy::SwitchStateReading msgGpioRead;
+
+    senderStamp = m_senderStampAsState;
+    msgGpioRead.state((uint16_t)m_asState);
+    m_od4.send(msgGpioRead, sampleTime, senderStamp);
+
+    senderStamp = m_senderStampEBSFault;
+    msgGpioRead.state((uint16_t)m_ebsFault);
+    m_od4.send(msgGpioRead, sampleTime, senderStamp);
+
+    senderStamp = m_senderStampEbsState;
+    msgGpioRead.state((uint16_t)m_ebsState);
+    m_od4.send(msgGpioRead, sampleTime, senderStamp);
+
+
+    // Torque requests to CAN proxy
+    opendlv::proxy::TorqueRequest msgTorqueReq;
+
+    opendlv::cfsdProxy::TorqueRequestDual msgTorqueReqDual;
+    senderStamp = m_senderStampTorqueOut;
+    msgTorqueReqDual.torqueLeft(m_torqueReqLeftCan);
+    msgTorqueReqDual.torqueRight(m_torqueReqRightCan);
+    m_od4.send(msgTorqueReqDual, sampleTime, senderStamp);
   }
-  
-
-  // m_compressor Msg
-  if (m_compressor != m_compressorOld || m_refreshMsg) {
-    senderStamp = m_gpioStampCompressor + m_senderStampOffsetGpio;
-    msgGpio.state(m_compressor);
-    m_od4.send(msgGpio, sampleTime, senderStamp);
-    m_compressorOld = m_compressor;
-  }
-  
-  // m_finished Msg
-  if (m_finished != m_finishedOld || m_refreshMsg) {
-    senderStamp = m_gpioStampFinished + m_senderStampOffsetGpio;
-    msgGpio.state(m_finished);
-    m_od4.send(msgGpio, sampleTime, senderStamp);
-    m_finishedOld = m_finished;
-  }
-
-  // m_shutdown Msg
-  if (m_shutdown != m_shutdownOld || m_refreshMsg) {
-    senderStamp = m_gpioStampShutdown + m_senderStampOffsetGpio;
-    msgGpio.state(m_shutdown);
-    m_od4.send(msgGpio, sampleTime, senderStamp);
-    m_shutdownOld = m_shutdown;
-  }
-  
-  // m_serviceBrake
-  if (m_serviceBrake != m_serviceBrakeOld || m_refreshMsg) {
-    senderStamp = m_gpioStampServiceBrake + m_senderStampOffsetGpio;
-    msgGpio.state(m_serviceBrake);
-    m_od4.send(msgGpio, sampleTime, senderStamp);
-    m_serviceBrakeOld = m_serviceBrake;
-  }
-
-  senderStamp = m_senderStampRTD;
-  msgGpio.state((uint16_t)m_rtd);
-  m_od4.send(msgGpio, sampleTime, senderStamp);
-
-
-  // Send pwm Requests
-  opendlv::proxy::PulseWidthModulationRequest msgPwm;
-  
-  if (m_redDuty != m_redDutyOld) {
-    senderStamp = m_pwmStampAssiRed + m_senderStampOffsetPwm;
-    msgPwm.dutyCycleNs(m_redDuty);
-    m_od4.send(msgPwm, sampleTime, senderStamp);
-    m_redDutyOld = m_redDuty;
-  }
-  if (m_greenDuty != m_greenDutyOld) {
-    senderStamp = m_pwmStampAssiGreen + m_senderStampOffsetPwm;
-    msgPwm.dutyCycleNs(m_greenDuty);
-    m_od4.send(msgPwm, sampleTime, senderStamp);
-    m_greenDutyOld = m_greenDuty;
-  }
-  if (m_blueDuty != m_blueDutyOld) {
-    senderStamp = m_pwmStampAssiBlue + m_senderStampOffsetPwm;
-    msgPwm.dutyCycleNs(m_blueDuty);
-    m_od4.send(msgPwm, sampleTime, senderStamp);
-    m_blueDutyOld = m_blueDuty;
-  }
-  
-  if (m_brakeDuty != m_brakeDutyOld || m_refreshMsg) {
-    senderStamp = m_pwmStampBrake + m_senderStampOffsetPwm;
-    msgPwm.dutyCycleNs(m_brakeDuty);
-    m_od4.send(msgPwm, sampleTime, senderStamp);
-    m_brakeDutyOld = m_brakeDuty;
-  }
-
-  //Send Current state of state machine
-  opendlv::proxy::SwitchStateReading msgGpioRead;
-
-  senderStamp = m_senderStampAsState;
-  msgGpioRead.state((uint16_t)m_asState);
-  m_od4.send(msgGpioRead, sampleTime, senderStamp);
-
-  senderStamp = m_senderStampEBSFault;
-  msgGpioRead.state((uint16_t)m_ebsFault);
-  m_od4.send(msgGpioRead, sampleTime, senderStamp);
-
-  senderStamp = m_senderStampEbsState;
-  msgGpioRead.state((uint16_t)m_ebsState);
-  m_od4.send(msgGpioRead, sampleTime, senderStamp);
-
-
-  // Torque requests to CAN proxy
-  opendlv::proxy::TorqueRequest msgTorqueReq;
-
-  opendlv::cfsdProxy::TorqueRequestDual msgTorqueReqDual;
-  senderStamp = m_senderStampTorqueOut;
-  msgTorqueReqDual.torqueLeft(m_torqueReqLeftCan);
-  msgTorqueReqDual.torqueRight(m_torqueReqRightCan);
-  m_od4.send(msgTorqueReqDual, sampleTime, senderStamp);
-
 }
 
 
@@ -667,15 +671,20 @@ void StateMachine::heartbeat()
   // from main loop
   while(m_od4.isRunning()) {
     // GPIO Msg
-    opendlv::proxy::SwitchStateRequest msgGpio;
+    {
+      //Locking od4 mutex to avoid conflict with other message sending
+      std::lock_guard<std::mutex> lock(m_od4Mutex);
+      opendlv::proxy::SwitchStateRequest msgGpio;
 
-    //Heartbeat Msg
-    m_heartbeat = !m_heartbeat;
-    uint16_t senderStamp = m_gpioStampHeartbeat + m_senderStampOffsetGpio;
-    msgGpio.state(m_heartbeat);
-    m_od4.send(msgGpio, cluon::time::now(), senderStamp);
-    using namespace std::chrono_literals;
-    std::this_thread::sleep_for(50ms);
+      //Heartbeat Msg
+      m_heartbeat = !m_heartbeat;
+      uint16_t senderStamp = m_gpioStampHeartbeat + m_senderStampOffsetGpio;
+      msgGpio.state(m_heartbeat);
+      m_od4.send(msgGpio, cluon::time::now(), senderStamp);
+      using namespace std::chrono_literals;
+      std::this_thread::sleep_for(50ms);
+    }
+
   }
 }
 
