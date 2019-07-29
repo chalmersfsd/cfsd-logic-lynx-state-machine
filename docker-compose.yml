@@ -2,8 +2,6 @@ version: '2'
 
 services:
     state-machine:
-        image: lowitz/state-machine:v0.0.1
+        image: chalmersfsd/cfsd-logic-lynx-state-machine:tag
         network_mode: "host"
-       depends_on:
-         - cangw-res # Wait for the RES communication for "handshake"
-        command: "state-machine --cid=219 --cidAnalog=219 --cidGpio=219 --cidPwm=219 --freq=2 --verbose"
+        command: "state-machine --cid=130 --freq=30"

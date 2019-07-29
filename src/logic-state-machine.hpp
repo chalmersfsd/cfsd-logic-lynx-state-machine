@@ -24,6 +24,7 @@
 #include <chrono>
 #include <cstdint>
 #include <string>
+#include <mutex>
 
 enum asState {
     AS_OFF,
@@ -74,23 +75,27 @@ class StateMachine {
     StateMachine &operator=(StateMachine &&) = delete;
 
   public:
-    StateMachine(cluon::OD4Session &od4, cluon::OD4Session &od4Analog, cluon::OD4Session &od4Gpio, cluon::OD4Session &od4Pwm, bool verbose);
+    StateMachine(cluon::OD4Session &od4, bool verbose);
     ~StateMachine();
 
   private:
     void setUp();
     void tearDown();
-    void ebsInit();
-    void brakeUpdate();
-    void stateUpdate();
+    void brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
+                     float pressureEbsAct, float pressureEbsLine,
+                     float pressureServiceTank, float pressureServiceReg);
+    void stateUpdate(bool asms, bool finishSignal,
+                     bool resGoSignal, bool tsOn, bool clampExtended,
+                     bool resStopSignal, asMission mission,
+                     int16_t torqueReqLeft, int16_t torqueReqRight,
+                     uint32_t brakeDutyReq, float vehicleSpeed);
     void setAssi();
     void sendMessages();
-    void runMission();
-    void stopMission();
+    void heartbeat();
+    uint64_t msTimeNow();
 
   public:
-    void body();
-    bool getInitialized();
+    void step();
     asState getAsState();
     void setLastUpdateAnalog(cluon::data::TimeStamp time);
     void setLastUpdateGpio(cluon::data::TimeStamp time);
@@ -110,17 +115,11 @@ class StateMachine {
     void setSteerPosition(float pos);
     void setSteerPositionRack(float pos);
     void setBrakeDutyCycle(uint32_t duty);
-    void setTorqueReqLeft(int16_t torque);
-    void setTorqueReqRight(int16_t torque);
+    void setTorqueRequest(int16_t torqueRight, int16_t torqueLeft);
     void setResStatus(bool status);
 
   private:
     cluon::OD4Session &m_od4;
-    cluon::OD4Session &m_od4Analog;
-    cluon::OD4Session &m_od4Gpio;
-    cluon::OD4Session &m_od4Pwm;
-    cluon::data::TimeStamp m_lastUpdateAnalog;
-    cluon::data::TimeStamp m_lastUpdateGpio;
     asState m_prevState;
     asState m_asState;
     ebsState m_ebsState;
@@ -138,9 +137,8 @@ class StateMachine {
     uint32_t m_greenDutyOld;
     uint32_t m_redDuty;
     uint32_t m_redDutyOld;
-    uint16_t m_torqueReqLeftCan;
-    uint16_t m_torqueReqRightCan;
-    bool m_initialized;
+    int16_t m_torqueReqLeftCan;
+    int16_t m_torqueReqRightCan;
     bool m_compressor;
     bool m_compressorOld;
     bool m_modulesRunning;
@@ -152,7 +150,6 @@ class StateMachine {
     bool m_ebsFault;
     bool m_flash2Hz;
     bool m_rtd;
-    bool m_firstCycleAsOff;
     bool m_finished;
     bool m_finishedOld;
     bool m_shutdown;
@@ -165,6 +162,8 @@ class StateMachine {
     bool m_verbose;
 
     // Received from other microservices
+    cluon::data::TimeStamp em_lastUpdateAnalog;
+    cluon::data::TimeStamp em_lastUpdateGpio;
     asMission em_mission;
     bool em_asms;
     bool em_tsOn; // tsOn shares the same signal as ebsOk for now. TODO: Change to other signal when available
@@ -176,15 +175,21 @@ class StateMachine {
     bool em_resStatus;
     bool em_resInitialized;
     float em_vehicleSpeed;
-    float em_pressureEbsAct;
-    float em_pressureEbsLine;
-    float em_pressureServiceTank;
-    float em_pressureServiceReg;
-    float em_steerPosition;
-    float em_steerPositionRack;
-    uint32_t em_brakeDutyRequest;
+    float em_prEbsAct;
+    float em_prEbsLine;
+    float em_prServiceTank;
+    float em_prServiceReg;
+    float em_steerPosAct;
+    float em_steerPosRack;
+    uint32_t em_brakeDutyReq;
     int16_t em_torqueReqLeft;
     int16_t em_torqueReqRight;
+
+    // Resource mutex for all data set by data triggers
+    std::mutex m_resourceMutex;
+
+    // Run heartbeat in separate thread
+    std::thread _heartbeatThread;
 
   public:
     // Senderstamps offset
@@ -194,16 +199,15 @@ class StateMachine {
 
     // Broadcast
     const uint16_t m_senderStampResInitialize = 1099;
+    const uint16_t m_senderStampTorqueOut = 1910;
     const uint16_t m_senderStampAsState = 2101;
-    const uint16_t m_senderStampRTD = 2104;
+    const uint16_t m_senderStampRTD = 1904;
     const uint16_t m_senderStampEBSFault = 2105;
     const uint16_t m_senderStampBrakeReq = 2150;
     const uint16_t m_senderStampSteeringState = 2113;
     const uint16_t m_senderStampEbsState = 2114;
-    const uint16_t m_senderStampServiceValveState = 2115;
-    const uint16_t m_senderStampTorqueLeft = 1502;
-    const uint16_t m_senderStampTorqueRight = 1503;
 
+    // Torque senderstamps
     const uint16_t m_senderStampTorqueIn = 2101;
 
     // Input from RES proxy
@@ -214,8 +218,11 @@ class StateMachine {
     // Input from CAN proxy
     const uint16_t m_senderStampAsMission = 1906;
 
+    // Input from SLAM
+    const uint16_t m_senderStampGroundSpeed = 3000;
+
     // Depends on pin value in opendlv-device-stm32-lynx
-    const uint16_t m_gpioStampEbsOk = 99; // TODO: set back to 49 when HV is in
+    const uint16_t m_gpioStampEbsOk = 49;
     const uint16_t m_gpioStampAsms = 115;
     const uint16_t m_gpioStampClampSensor = 112;
 
