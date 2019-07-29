@@ -311,7 +311,7 @@ void StateMachine::brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
 
   // Check if the compressor should be on/off
   // TODO: Tune pressure parameters
-  if ((prEbsLine > 7.0f && prServiceTank > 8.0f) || prServiceTank > 9.0f ||
+  if ((prEbsLine > 7.0f && prServiceTank > 8.0f) || prServiceTank > 8.3f ||
         prServiceTank < -0.05f || m_asState == asState::AS_EMERGENCY || !m_modulesRunning) {
     m_compressor = false;
   } else if (asms && (prEbsLine < 6.0f || prServiceTank < 6.0f)) {
