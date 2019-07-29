@@ -37,5 +37,8 @@ build/
 # VSCode
 .vscode/
 
+# Generated log
+*.log
+
 # Other
-sendToLynx.txt
+state-machine-test.yml

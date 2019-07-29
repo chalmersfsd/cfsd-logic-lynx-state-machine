@@ -25,6 +25,9 @@
 #include <cstdint>
 #include <string>
 #include <mutex>
+#include <sstream>
+#include <fstream>
+#include <iomanip>
 
 enum asState {
     AS_OFF,
@@ -92,6 +95,8 @@ class StateMachine {
     void setAssi();
     void sendMessages();
     void heartbeat();
+    void logError(std::string errorMsg);
+    std::string generateLogPath();
     uint64_t msTimeNow();
 
   public:
@@ -142,6 +147,7 @@ class StateMachine {
     bool m_compressor;
     bool m_compressorOld;
     bool m_modulesRunning;
+    bool m_modulesCrashed;
     bool m_serviceBrake;
     bool m_serviceBrakeOld;
     bool m_serviceBrakePressureOk;
@@ -160,6 +166,7 @@ class StateMachine {
     bool m_refreshMsg;
     bool m_brakesReleased;
     bool m_verbose;
+    std::string m_logPath;
 
     // Received from other microservices
     cluon::data::TimeStamp em_lastUpdateAnalog;

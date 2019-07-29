@@ -43,6 +43,7 @@ StateMachine::StateMachine(cluon::OD4Session &od4, bool verbose)
   , m_compressor{false}
   , m_compressorOld{false}
   , m_modulesRunning{false}
+  , m_modulesCrashed{false}
   , m_serviceBrake{false}
   , m_serviceBrakeOld{false}
   , m_serviceBrakePressureOk{false}
@@ -61,6 +62,7 @@ StateMachine::StateMachine(cluon::OD4Session &od4, bool verbose)
   , m_refreshMsg{true}
   , m_brakesReleased{false}
   , m_verbose{verbose}
+  , m_logPath{}
 
   , em_lastUpdateAnalog{}
   , em_lastUpdateGpio{}
@@ -103,6 +105,9 @@ StateMachine::StateMachine(cluon::OD4Session &od4, bool verbose)
   // Start heartbeat in its own thread
   _heartbeatThread = std::thread(&StateMachine::heartbeat, this);
   _heartbeatThread.detach();
+
+  // Generate log file name with current time
+  m_logPath = generateLogPath();
 
   std::cout << "done." << std::endl;
 }
@@ -161,11 +166,17 @@ void StateMachine::step()
   uint64_t threadTime = cluon::time::toMicroseconds(cluon::time::now());
   uint64_t analogDelay = threadTime - lastUpdateAnalog;
   uint64_t gpioDelay = threadTime - lastUpdateGpio;
-  if( ( (analogDelay > 500000U) || (gpioDelay > 1000000U) ) && m_modulesRunning){
+  if( ( (analogDelay > 500000U) || (gpioDelay > 1000000U) ) && m_modulesRunning &&
+        !m_modulesCrashed){
       m_modulesRunning = false;
-      std::cout << "[ASS-ERROR] AS_NODE has crashed"
-                << "Last gpio update:" << gpioDelay 
-                << "\t Last analog update: " << analogDelay << std::endl;
+      m_modulesCrashed = true;
+
+      std::ostringstream errorMsg;
+      errorMsg << "[AS-ERROR] AS_NODE has crashed"
+               << "\nLast gpio update:" << gpioDelay 
+               << "\nLast analog update: " << analogDelay;
+      std::cout << errorMsg.str() << std::endl;
+      logError(errorMsg.str());
   }
 
   if (ebsOk) { // TODO: Remove this when tsOn signal has been added to AS node
@@ -189,9 +200,13 @@ void StateMachine::step()
   bool steeringDiffLarge = std::fabs(steerPosAct - steerPosRack) > 10.0f;
   if (systemReadyOrDriving && (!clampExtended || steeringDiffLarge) && resGoSignal) {
     m_steerFault = true;
-    std::cout << "[AS-ERROR] Steering Failure"
-              << "\nm_clampExtended:    " << clampExtended 
-              << "\nsteeringDiffLarge:  " << steeringDiffLarge << std::endl;        
+
+    std::ostringstream errorMsg;
+    errorMsg << "[AS-ERROR] Steering Failure"
+             << "\nm_clampExtended:    " << clampExtended 
+             << "\nsteeringDiffLarge:  " << steeringDiffLarge;
+    std::cout << errorMsg.str() << std::endl;
+    logError(errorMsg.str());
   } else {
     m_steerFault = false;  
   }
@@ -200,11 +215,11 @@ void StateMachine::step()
     uint64_t threadTimeEnd = cluon::time::toMicroseconds(cluon::time::now());
     std::cout << "[AS-STATE-UPDATE]"
             << "\nThread time:           " << threadTimeEnd << " microseconds"
-            << "\nCurrent AS state:      " << m_asState 
-            << "\nMission:               " << mission
-            << "\nEBS init state:        " << m_ebsInitState
+            << "\nCurrent AS state:      " << m_asState
+            << "\nEBS Init state:        " << m_ebsInitState
             << "\nEBS state:             " << m_ebsState
             << "\nBrake state:           " << m_brakeState 
+            << "\nMission:               " << mission
             << "\nebsOk:                 " << ebsOk
             << "\nASMS:                  " << asms
             << "\nCompressor:            " << m_compressor 
@@ -214,12 +229,10 @@ void StateMachine::step()
             << "\nEBS pressure line:     " << prEbsLine
             << "\nEBS pressure act:      " << prEbsAct
             << "\nPressure service tank: " << prServiceTank
-            << "\nPressure service reg:  " << prServiceReg 
-            << "\nFlash ASSI:            " << m_flash2Hz
+            << "\nPressure service reg:  " << prServiceReg
             << "\nRGB ASSI:              " << m_redDuty << "|" << m_greenDuty << "|" << m_blueDuty
             << "\nbrakeDuty:             " << m_brakeDuty
             << "\nbrakeDutyReq:          " << brakeDutyReq
-            << "\nUpdate time:           " << (float)(threadTimeEnd - threadTime) / 1000.0f << " ms"
             << "\nLast analog update:    " << (float)(analogDelay) / 1000.0f << " ms"
             << "\nLast GPIO update:      " << (float)(gpioDelay) / 1000.0f << " ms"
             << "\n" << std::endl;
@@ -259,15 +272,27 @@ void StateMachine::brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
       }
       else if (((m_lastEbsInitTransition + 5000) <= timeMillis) && (prEbsAct <= 0.5f && prEbsLine < 0.5f)) // TODO: check EBS_line too
       {
-        std::cout << "[EBS-Init] Failed to increase pressure above 0.5bar in 5s."
-                  << "\nm_pressureEbsAct:     " << prEbsAct
-                  << "\nm_pressureServiceReg: " << prServiceReg << std::endl;
+        std::ostringstream errorMsg;
+        errorMsg << "[EBS-Init] Failed to increase pressure above 0.5bar in 5s."
+                 << "\nm_pressureEbsAct:     " << prEbsAct
+                 << "\nm_pressureServiceReg: " << prServiceReg
+                 << "\nm_ebsInitState: " << m_ebsInitState;
+        std::cout << errorMsg.str() << std::endl;
+        logError(errorMsg.str());
+
         m_ebsInitState = ebsInitState::EBS_INIT_FAILED;
         m_lastEbsInitTransition = timeMillis;
       }
       else if (((m_lastEbsInitTransition + 60000) <= timeMillis))
       {
-        std::cout << "[EBS-Init] Failed to increase pressures 60s." << std::endl;
+        std::ostringstream errorMsg;
+        errorMsg << "[EBS-Init] Failed to increase pressures 60s."
+                 << "\nm_pressureEbsAct:     " << prEbsAct
+                 << "\nm_pressureServiceReg: " << prServiceReg
+                 << "\nm_ebsInitState: " << m_ebsInitState;
+        std::cout << errorMsg.str() << std::endl;
+        logError(errorMsg.str());
+
         m_ebsInitState = ebsInitState::EBS_INIT_FAILED;
         m_lastEbsInitTransition = timeMillis;
       }
@@ -284,11 +309,6 @@ void StateMachine::brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
 
     default:
       break;
-    }
-
-    if (m_verbose && m_refreshMsg)
-    {
-      std::cout << "[EBS-Init] Current EBS Init state: " << m_ebsInitState << std::endl;
     }
   }
 
@@ -325,14 +345,20 @@ void StateMachine::brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
 
   // Check the EBS, service and steering status if ASMS is on
   if (asms) {
-    if (sensorDisconnected || ebsPressureFail || serviceBrakeLow || m_ebsInitState == EBS_INIT_FAILED){
+    if ((sensorDisconnected || ebsPressureFail || serviceBrakeLow ||
+          m_ebsInitState == EBS_INIT_FAILED) && !m_ebsFault) {
       m_ebsFault = true;
-      std::cout << "[AS-ERROR] EBS failure"
-                << "\nsensorDisconnected: " << sensorDisconnected 
-                << "\nebsPressureFail:    " << ebsPressureFail 
-                << "\nserviceBrakeLow:    " << serviceBrakeLow 
-                << "\nm_ebsInitFail:      " << m_ebsInitState << std::endl;        
-    } else {
+
+      std::ostringstream errorMsg;
+      errorMsg << "[AS-ERROR] EBS failure"
+               << "\nsensorDisconnected: " << sensorDisconnected 
+               << "\nebsPressureFail:    " << ebsPressureFail 
+               << "\nserviceBrakeLow:    " << serviceBrakeLow 
+               << "\nm_ebsInitFail:      " << m_ebsInitState;
+      std::cout << errorMsg.str() << std::endl;
+      logError(errorMsg.str());        
+    } else if (!sensorDisconnected && !ebsPressureFail && !serviceBrakeLow &&
+          m_ebsInitState != EBS_INIT_FAILED && m_ebsFault) {
       m_ebsFault = false;
     }
 
@@ -340,16 +366,21 @@ void StateMachine::brakeUpdate(bool asms, bool ebsOk, bool resStopSignal,
                       (m_asState == asState::AS_READY || m_asState == asState::AS_DRIVING || m_asState == asState::AS_FINISHED)){
       m_ebsActivatedTime = timeMillis;
       m_ebsState = ebsState::EBS_ACTIVATED;
-      std::cout << "[AS-ERROR] EBS activated"
-              << "\nCurrent state:    " << m_asState 
-              << "\nValues: m_ebsOk:  " << ebsOk 
-              << "\nm_modulesRunning: " << m_modulesRunning 
-              << "\nm_ebsFault:       " << m_ebsFault 
-              << "\nm_steerFault:     " << m_steerFault 
-              << "\nm_shutdown:       " << m_shutdown
-              << "\nm_finished:       " << m_finished
-              << "\nm_prevState:      " << m_prevState 
-              << "\nm_resStopSignal:  " << resStopSignal << std::endl;
+
+      std::ostringstream errorMsg;
+      errorMsg << "[AS-ERROR] EBS activated"
+               << "\nCurrent AS state: " << m_asState
+               << "\nEBS Init state:   " << m_ebsInitState 
+               << "\nm_ebsOk:          " << ebsOk 
+               << "\nm_modulesRunning  " << m_modulesRunning 
+               << "\nm_ebsFault:       " << m_ebsFault 
+               << "\nm_steerFault:     " << m_steerFault 
+               << "\nm_shutdown:       " << m_shutdown
+               << "\nm_finished:       " << m_finished
+               << "\nm_prevState:      " << m_prevState 
+               << "\nm_resStopSignal:  " << resStopSignal;
+      std::cout << errorMsg.str() << std::endl;
+      logError(errorMsg.str());
     }
   }
 }
@@ -691,6 +722,25 @@ void StateMachine::heartbeat()
 
 
 // ################################## UTILITY #################################
+std::string StateMachine::generateLogPath()
+{
+  auto time = std::time(nullptr);
+  std::stringstream ss;
+  ss << std::put_time(std::localtime(&time), "%Y-%m-%d_%H-%M-%S"); // ISO 8601 without timezone information.
+  std::string dateString = ss.str();
+
+  std::string logPath = "/opt/stateMachine_" + dateString + ".log";
+  return logPath;
+}
+
+void StateMachine::logError(std::string errorMsg)
+{
+  std::ofstream myfile;
+  myfile.open(m_logPath, std::ios::app);
+  myfile << "\n\n" << errorMsg;
+  myfile.close();
+}
+
 uint64_t StateMachine::msTimeNow()
 {
   std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
