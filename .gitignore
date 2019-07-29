@@ -33,3 +33,9 @@
 
 # Build folder
 build/
+
+# VSCode
+.vscode/
+
+# Other
+sendToLynx.txt

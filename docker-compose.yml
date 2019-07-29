@@ -1,0 +1,7 @@
+version: '2'
+
+services:
+    state-machine:
+        image: chalmersfsd/cfsd-logic-lynx-state-machine:tag
+        network_mode: "host"
+        command: "state-machine --cid=130 --freq=30"
