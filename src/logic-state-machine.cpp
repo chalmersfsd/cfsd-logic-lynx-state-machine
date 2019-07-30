@@ -427,7 +427,7 @@ void StateMachine::stateUpdate(bool asms, bool finishSignal,
     case asState::AS_READY: {
       m_brakeState = serviceBrakeState::BRAKE_ENGAGED;
       m_serviceBrake = true;
-      m_brakeDuty = asms ? 20000U : 0U;
+      m_brakeDuty = asms ? 50000U : 0U;
       
       bool waitToDrive = (timeMillis - m_lastStateTransition > 5000U);
       // ---------------------- AS_READY -> AS_EMERGENCY ----------------------
@@ -460,7 +460,7 @@ void StateMachine::stateUpdate(bool asms, bool finishSignal,
       m_torqueReqRightCan = torqueReqRight;
       m_rtd = true;
 
-      m_brakeDuty = ((m_lastStateTransition+500U) >= timeMillis) ? 20000U : brakeDutyReq;
+      m_brakeDuty = ((m_lastStateTransition+500U) >= timeMillis) ? 50000U : brakeDutyReq;
       
       // --------------------- AS_DRIVING -> AS_EMERGENCY ---------------------
       if (m_ebsState == EBS_ACTIVATED) {
