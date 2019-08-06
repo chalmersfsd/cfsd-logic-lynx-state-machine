@@ -176,9 +176,12 @@ void StateMachine::step()
       std::ostringstream errorMsg;
       errorMsg << "[AS-ERROR] AS_NODE has crashed"
                << "\nLast gpio update:" << gpioDelay 
-               << "\nLast analog update: " << analogDelay;
+               << "\nLast analog update: " << analogDelay
+               << "\nTimestamp: " << threadTime;
       std::cout << errorMsg.str() << std::endl;
       logError(errorMsg.str());
+  } else if ((analogDelay < 500000U) && (gpioDelay < 1000000U) && m_modulesCrashed) {
+    m_modulesCrashed = false;
   }
 
   if (ebsOk) { // TODO: Remove this when tsOn signal has been added to AS node
@@ -635,7 +638,7 @@ void StateMachine::sendMessages()
       m_serviceBrakeOld = m_serviceBrake;
     }
 
-    m_autonomousMode = (em_mission != 7 || em_mission != 0) ? true : false;
+    m_autonomousMode = (em_mission != asMission::AMI_MANUAL || em_mission != asMission::AMI_NONE) ? true : false;
     if (m_autonomousMode != m_autonomousModeOld || m_refreshMsg) {
       senderStamp = m_gpioStampAutonomousMode + m_senderStampOffsetGpio;
       msgGpio.state(m_autonomousMode);
