@@ -554,12 +554,12 @@ void StateMachine::setAssi()
     case asState::AS_READY:
       m_blueDuty  = 0U;
       m_greenDuty = 50000U;
-      m_redDuty   = 0U;
+      m_redDuty   = 50000U;
       break;
     case asState::AS_DRIVING:
       m_blueDuty  = 0U;
       m_greenDuty = 50000U*m_flash2Hz;
-      m_redDuty   = 0U;
+      m_redDuty   = 50000U*m_flash2Hz;
       break;
     case asState::AS_FINISHED:
       m_blueDuty  = 50000U;
