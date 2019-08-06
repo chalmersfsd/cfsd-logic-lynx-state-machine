@@ -61,6 +61,8 @@ StateMachine::StateMachine(cluon::OD4Session &od4, bool verbose)
   , m_heartbeat{false}
   , m_refreshMsg{true}
   , m_brakesReleased{false}
+  , m_autonomousMode{false}
+  , m_autonomousModeOld{false}
   , m_verbose{verbose}
   , m_logPath{}
 
@@ -601,7 +603,6 @@ void StateMachine::sendMessages()
       m_ebsSpeakerOld = m_ebsSpeaker;
     }
 
-
     // m_compressor Msg
     if (m_compressor != m_compressorOld || m_refreshMsg) {
       senderStamp = m_gpioStampCompressor + m_senderStampOffsetGpio;
@@ -632,6 +633,14 @@ void StateMachine::sendMessages()
       msgGpio.state(m_serviceBrake);
       m_od4.send(msgGpio, sampleTime, senderStamp);
       m_serviceBrakeOld = m_serviceBrake;
+    }
+
+    m_autonomousMode = (em_mission != 7 || em_mission != 0) ? true : false;
+    if (m_autonomousMode != m_autonomousModeOld || m_refreshMsg) {
+      senderStamp = m_gpioStampAutonomousMode + m_senderStampOffsetGpio;
+      msgGpio.state(m_autonomousMode);
+      m_od4.send(msgGpio, sampleTime, senderStamp);
+      m_autonomousModeOld = m_autonomousMode;
     }
 
     senderStamp = m_senderStampRTD;

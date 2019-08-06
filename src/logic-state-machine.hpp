@@ -165,6 +165,8 @@ class StateMachine {
     bool m_heartbeat;
     bool m_refreshMsg;
     bool m_brakesReleased;
+    bool m_autonomousMode;
+    bool m_autonomousModeOld;
     bool m_verbose;
     std::string m_logPath;
 
@@ -241,6 +243,7 @@ class StateMachine {
     const uint16_t m_gpioStampFinished = 66;
     const uint16_t m_gpioStampShutdown = 67;
     const uint16_t m_gpioStampServiceBrake = 69;
+    const uint16_t m_gpioStampAutonomousMode = 90;
 
     const uint16_t m_pwmStampAssiBlue = 0;
     const uint16_t m_pwmStampAssiRed = 20;
