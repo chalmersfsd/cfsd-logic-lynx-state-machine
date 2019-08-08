@@ -638,7 +638,7 @@ void StateMachine::sendMessages()
       m_serviceBrakeOld = m_serviceBrake;
     }
 
-    m_autonomousMode = (em_mission != asMission::AMI_MANUAL || em_mission != asMission::AMI_NONE) ? true : false;
+    m_autonomousMode = (em_mission == asMission::AMI_MANUAL || em_mission == asMission::AMI_NONE) ? false : true;
     if (m_autonomousMode != m_autonomousModeOld || m_refreshMsg) {
       senderStamp = m_gpioStampAutonomousMode + m_senderStampOffsetGpio;
       msgGpio.state(m_autonomousMode);
